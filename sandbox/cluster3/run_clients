@@ -1,8 +1,8 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 for i in `seq 1 $2`;
 do
-    $DIR/run_client $2 &
+    $DIR/run_client "$1" &
 done 
