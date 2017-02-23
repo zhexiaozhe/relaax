@@ -1,0 +1,3 @@
+ps: PYTHONUNBUFFERED=true relaax-parameter-server --config config.yaml
+rlx: PYTHONUNBUFFERED=true relaax-rlx-server --config config.yaml
+tb: PYTHONUNBUFFERED=true tensorboard --logdir metrics
