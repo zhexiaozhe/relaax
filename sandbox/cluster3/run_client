@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+while :
+do
+    python ../../clients/rl_client_ale.py --agent "$1"
+    echo "Starting new client in 10 seconds. Press [CTRL+C] to cancel ..."
+    sleep 10
+done

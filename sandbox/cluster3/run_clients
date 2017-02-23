@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+for i in `seq 1 $2`;
+do
+    ./run_client $2 &
+done 
