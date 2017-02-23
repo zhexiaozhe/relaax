@@ -1,0 +1,107 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+import sys
+sys.path.append('../../pkg')
+
+import numpy
+import random
+
+import loop.socket_loop
+
+
+class Numerator(object):
+    LOW = 0
+    HIGH = 84
+    MID = (LOW + HIGH) / 2
+    ACTION_STEP = 3
+    ZONE = 5
+    N_STEPS = 200
+    MAX_SPEED = 3
+
+    def __init__(self):
+        self._level = self.MID
+        self._step = 0
+        self._speed = 0
+        self.reset()
+
+    def act(self, action):
+        assert action == 0 or action == 1
+        # action = random.randint(0, 1)
+        if action == 1:
+            self._level -= self.ACTION_STEP
+
+        reward = 0
+        if abs(self._level - self.MID) < self.ZONE:
+            reward = 1
+
+        self._next_step()
+        reset = False
+        if self._step >= self.N_STEPS:
+            reset = True
+        if self._level < self.LOW or self.HIGH <= self._level:
+            reset = True
+        if abs(self._level - self.MID) > self.ZONE:
+            reset = True
+
+        return reward, reset
+
+    def reset(self):
+        self._level = self.MID
+        self._step = 0
+        self._speed = 0
+        self._next_step()
+
+    def state(self):
+        picture = numpy.zeros((84, 84), dtype=numpy.float32)
+        for i in xrange(self._level):
+            for j in xrange(picture.shape[1]):
+                picture[i, j] = 1
+        return picture
+
+
+    def _next_step(self):
+        low = -1
+        high = 1
+        if self._speed == 0:
+            low = 0
+        if self._speed == self.MAX_SPEED:
+            high = 0
+        self._speed += random.randint(low, high)
+
+        self._level += self._speed
+
+        self._step += 1
+
+
+class _Environment(object):
+    def __init__(self, game):
+        self._game = game
+        self._n_game = 0
+        self._reshape = False
+
+    def get_state(self):
+        state = self._game.state()
+        if self._reshape:
+            state = numpy.reshape(state, (84, 84, 1))
+        return state
+
+    def act(self, action):
+        answer = self._game.act(action)
+        self._reshape = True
+        return answer
+
+    def reset(self, score):
+        self._n_game += 1
+        print("Score at game", self._n_game, "=", score)
+        self._game.reset()
+        self._reshape = False
+
+
+def main():
+    loop.socket_loop.run_environment('localhost:7001', _Environment(Numerator()))
+
+
+if __name__ == "__main__":
+    main()
