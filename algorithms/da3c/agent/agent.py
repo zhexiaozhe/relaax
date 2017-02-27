@@ -24,8 +24,9 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         with tf.device(kernel):
             self._local_network = network.make(config)
 
-        self.global_t = 0  # counter for global steps between all agents
-        self.local_t = 0  # steps count for current agent's thread
+        self.global_t = 0        # counter for global steps between all agents
+        self.local_t = 0         # steps count for current agent's thread
+        self.updates_t = 0       # counter for global updates
         self.episode_reward = 0  # score accumulator for current game
 
         self.states = []  # auxiliary states accumulator through episode_len = 0..5
@@ -203,7 +204,6 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
                 self._local_network.r: batch_R
             }
 
-        weights = self._session.run(self._local_network.values)
         entropy, p_loss, v_loss, grads = self._session.run([self._local_network.entropy,
                                                             self._local_network.policy_loss,
                                                             self._local_network.value_loss,
@@ -211,16 +211,19 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
                                                            feed_dict=feed_dict)
         self._parameter_server.apply_gradients(grads)
 
-        if (self.local_t % 100) == 0:
-            print("TIMESTEP", self.local_t)
-
         # Additional metrics
         self.metrics().scalar('policy loss', p_loss.item())
         self.metrics().scalar('value loss', v_loss.item())
         self.metrics().scalar('entropy', entropy.mean().item())
 
-        for idx, grad in enumerate(grads):
-            self.metrics().scalar('gradient {}'.format(idx), grad.mean().item())
+        if (self.updates_t % 20) == 0:
+            print("TIMESTEP", self.local_t)
+            weights = self._session.run(self._local_network.values)
 
-        for idx, weight in enumerate(weights):
-            self.metrics().scalar('weight'.format(idx), weight.mean().item())
+            for idx, grad in enumerate(grads):
+                self.metrics().scalar('gradient {}'.format(idx), grad.mean().item())
+
+            for idx, weight in enumerate(weights):
+                self.metrics().scalar('weight {}'.format(idx), weight.mean().item())
+
+        self.updates_t += 1
