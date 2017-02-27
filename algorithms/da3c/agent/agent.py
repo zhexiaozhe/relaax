@@ -24,20 +24,20 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         with tf.device(kernel):
             self._local_network = network.make(config)
 
-        self.global_t = 0           # counter for global steps between all agents
-        self.local_t = 0            # steps count for current agent's thread
-        self.episode_reward = 0     # score accumulator for current game
+        self.global_t = 0  # counter for global steps between all agents
+        self.local_t = 0  # steps count for current agent's thread
+        self.episode_reward = 0  # score accumulator for current game
 
-        self.states = []            # auxiliary states accumulator through episode_len = 0..5
-        self.actions = []           # auxiliary actions accumulator through episode_len = 0..5
-        self.rewards = []           # auxiliary rewards accumulator through episode_len = 0..5
-        self.values = []            # auxiliary values accumulator through episode_len = 0..5
+        self.states = []  # auxiliary states accumulator through episode_len = 0..5
+        self.actions = []  # auxiliary actions accumulator through episode_len = 0..5
+        self.rewards = []  # auxiliary rewards accumulator through episode_len = 0..5
+        self.values = []  # auxiliary values accumulator through episode_len = 0..5
 
-        self.episode_t = 0          # episode counter through episode_len = 0..5
-        self.terminal_end = False   # auxiliary parameter to compute R in update_global and frameQueue
+        self.episode_t = 0  # episode counter through episode_len = 0..5
+        self.terminal_end = False  # auxiliary parameter to compute R in update_global and frameQueue
         self.start_lstm_state = None
 
-        self.obsQueue = None        # observation accumulator for state = history_len * consecutive frames
+        self.obsQueue = None  # observation accumulator for state = history_len * consecutive frames
 
         initialize_all_variables = tf.variables_initializer(tf.global_variables())
 
@@ -80,7 +80,7 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
             print("pi=", pi_)
             print(" V=", value_)
 
-        self.metrics().scalar('server latency', time.time() - start)
+            self.metrics().scalar('server latency', time.time() - start)
 
         return action
 
@@ -142,10 +142,10 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
 
     def _update_state(self, obs):
         if not self.terminal_end and self.local_t != 0:
-            np.delete(self.obsQueue, 0, len(self._config.state_size))
-            np.append(self.obsQueue,
-                      np.reshape(obs, obs.shape + (1,)),
-                      axis=len(self._config.state_size))
+            self.obsQueue = np.delete(self.obsQueue, 0, len(self._config.state_size))
+            self.obsQueue = np.append(self.obsQueue,
+                                      np.reshape(obs, obs.shape + (1,)),
+                                      axis=len(self._config.state_size))
         else:
             self.obsQueue = np.repeat(np.reshape(obs, obs.shape + (1,)),
                                       self._config.history_len,
@@ -188,25 +188,39 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
             batch_R.reverse()
 
             feed_dict = {
-                    self._local_network.s: batch_si,
-                    self._local_network.a: batch_a,
-                    self._local_network.td: batch_td,
-                    self._local_network.r: batch_R,
-                    self._local_network.initial_lstm_state: self.start_lstm_state,
-                    self._local_network.step_size: [len(batch_a)]
+                self._local_network.s: batch_si,
+                self._local_network.a: batch_a,
+                self._local_network.td: batch_td,
+                self._local_network.r: batch_R,
+                self._local_network.initial_lstm_state: self.start_lstm_state,
+                self._local_network.step_size: [len(batch_a)]
             }
         else:
             feed_dict = {
-                    self._local_network.s: batch_si,
-                    self._local_network.a: batch_a,
-                    self._local_network.td: batch_td,
-                    self._local_network.r: batch_R
+                self._local_network.s: batch_si,
+                self._local_network.a: batch_a,
+                self._local_network.td: batch_td,
+                self._local_network.r: batch_R
             }
 
-
-        self._parameter_server.apply_gradients(
-            self._session.run(self._local_network.grads, feed_dict=feed_dict)
-        )
+        weights = self._session.run(self._local_network.values)
+        entropy, p_loss, v_loss, grads = self._session.run([self._local_network.entropy,
+                                                            self._local_network.policy_loss,
+                                                            self._local_network.value_loss,
+                                                            self._local_network.grads],
+                                                           feed_dict=feed_dict)
+        self._parameter_server.apply_gradients(grads)
 
         if (self.local_t % 100) == 0:
             print("TIMESTEP", self.local_t)
+
+        # Additional metrics
+        self.metrics().scalar('policy loss', p_loss.item())
+        self.metrics().scalar('value loss', v_loss.item())
+        self.metrics().scalar('entropy', entropy.mean().item())
+
+        for idx, grad in enumerate(grads):
+            self.metrics().scalar('gradient {}'.format(idx), grad.mean().item())
+
+        for idx, weight in enumerate(weights):
+            self.metrics().scalar('weight'.format(idx), weight.mean().item())
