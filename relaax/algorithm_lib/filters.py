@@ -96,53 +96,47 @@ class RunningStatExt(RunningStat):
 
 class ZFilterTF(object):
     """ y = (x-mean)/std using running estimates of mean, std """
-    def __init__(self, observation, demean=True, destd=True, clip=None):
-        self.demean = demean
-        self.destd = destd
-        self.clip = clip
-
-        self.rs = RunningStatTF(observation)
-
-    def __call__(self, x, update=True):
-        if update:
-            self.rs.push(x)
-        if self.demean:
-            x -= self.rs.mean
-        if self.destd:
-            x /= (self.rs.std+1e-8)
-        if self.clip:
-            x = np.clip(x, -self.clip, self.clip)
-        return x
-
-    @staticmethod
-    def output_shape(input_space):
-        return input_space.shape
+    def __init__(self, x, rs, demean=True, destd=True, clip=None):
+        xx = x
+        if demean:
+            xx = tf.subtract(xx, rs.mean)
+        if destd:
+            xx = tf.divide(xx, rs.std)
+        if clip is not None:
+            xx = tf.clip_by_value(xx, -clip, clip)
+        self.result = xx
 
 
 class RunningStatTF(object):
-    def __init__(self, observation, nb, meanb, varb, scope=None):
+    def __init__(self, observation=None, nb=None, meanb=None, varb=None, scope=None):
         if scope is not None:
             with tf.get_default_graph().name_scope(scope):
-                self.create_graph(observation, nb, meanb, varb)
+                self._make_graph(observation, nb, meanb, varb)
         else:
-            self.create_graph(observation, nb, meanb, varb)
+            self._make_graph(observation, nb, meanb, varb)
 
-    def create_graph(self, observation, nb, meanb, varb):
-        shape = observation.get_shape()
-        dtype = observation.dtype
+    def _make_graph(self, observation, nb, meanb, varb):
+        if observation is not None:
+            self._make_state(observation.get_shape(), observation.dtype)
+        else:
+            assert meanb is not None:
+            self._make_state(meanb.get_shape(), meanb.dtype)
 
+        self._make_push(observation)
+        if nb is not None:
+            assert meanb is not None
+            assert varb is not None
+            self._make_push_block(nb, meanb, varb)
+
+    def _make_state(shape, dtype):
         self.n = tf.Variable(0, tf.int64, name='n')
         self.mean = tf.Variable(tf.zeros(shape), dtype, name='mean')
         self._s = tf.Variable(tf.zeros(shape), dtype, name='s')
 
-        self.make_push(observation)
-
         self.var = tf.cond(self.n > 1, tf.div(self._s, tf.subtract(self.n, 1)), tf.square(self.mean))
         self.std = tf.sqrt(self.var)
 
-        self.make_push_block(nb, meanb, varb)
-
-    def make_push(self, observation):
+    def _make_push(self, observation):
         new_n = tf.add(self.n, 1)
         new_m = tf.add(self.mean, (observation - self.mean) / new_n)
         new_s = tf.add(self._s, (observation - self.mean) * (observation - new_m))
@@ -150,16 +144,15 @@ class RunningStatTF(object):
                              tf.assign(self.mean, new_m),
                              tf.assign(self._s, new_s))
 
-    def make_push_block(self, nb, meanb, varb):
+    def _make_push_block(self, nb, meanb, varb):
         new_n = tf.add(self.n, nb)
 
-        delta = tf.subtract(self.mean, meanb)
-        self.mean_block = tf.add(self.mean, delta * nb / new_n)
+        delta = tf.subtract(meanb, self.mean)
+        new_mean = tf.add(self.mean, delta * nb / new_n)
 
         m_b = varb * (nb - 1)
-        M2 = self.var + m_b + delta ** 2 * tf.multiply(self.n, nb) / new_n
-        self.std_block = tf.sqrt(M2 / (new_n - 1))
+        new_s = self._s + m_b + tf.square(delta) * tf.multiply(self.n, nb) / new_n
 
-        self.push_blcok = tf.group(tf.assign(self.n, new_n),
-                                   tf.assign(self.mean, self.mean_block),
-                                   tf.assign(self._s, self.std_block))
+        self.push_block = tf.group(tf.assign(self.n, new_n),
+                                   tf.assign(self.mean, new_mean),
+                                   tf.assign(self._s, new_s))
