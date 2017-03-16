@@ -96,12 +96,12 @@ class RunningStatExt(RunningStat):
 
 class ZFilterTF(object):
     """ y = (x-mean)/std using running estimates of mean, std """
-    def __init__(self, observation, demean=True, destd=True, clip=None):
+    def __init__(self, observation, nb, meanb, varb, demean=True, destd=True, clip=None, scope=None):
         self.demean = demean
         self.destd = destd
         self.clip = clip
 
-        self.rs = RunningStatTF(observation)
+        self.rs = RunningStatTF(observation, nb, meanb, varb, scope)
 
     def __call__(self, x, update=True):
         if update:
@@ -162,4 +162,4 @@ class RunningStatTF(object):
 
         self.push_blcok = tf.group(tf.assign(self.n, new_n),
                                    tf.assign(self.mean, self.mean_block),
-                                   tf.assign(self._s, self.std_block))
+                                   tf.assign(self.std, self.std_block))
