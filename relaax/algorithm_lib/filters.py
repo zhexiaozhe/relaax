@@ -108,33 +108,37 @@ class ZFilterTF(object):
 
 
 class RunningStatTF(object):
-    def __init__(self, observation=None, nb=None, meanb=None, varb=None, scope=None):
-        if scope is not None:
-            with tf.get_default_graph().name_scope(scope):
-                self._make_graph(observation, nb, meanb, varb)
-        else:
-            self._make_graph(observation, nb, meanb, varb)
-
-    def _make_graph(self, observation, nb, meanb, varb):
+    def __init__(self, observation=None, nb=None, meanb=None, varb=None, n=None, mean=None, var=None):
         if observation is not None:
             self._make_state(observation.get_shape(), observation.dtype)
         else:
-            assert meanb is not None:
+            assert meanb is not None
             self._make_state(meanb.get_shape(), meanb.dtype)
 
+        if n is not None:
+            assert mean is not None
+            assert var is not None
+            self._make_set(n, mean, var)
+
         self._make_push(observation)
+
         if nb is not None:
             assert meanb is not None
             assert varb is not None
             self._make_push_block(nb, meanb, varb)
 
-    def _make_state(shape, dtype):
+    def _make_state(self, shape, dtype):
         self.n = tf.Variable(0, tf.int64, name='n')
         self.mean = tf.Variable(tf.zeros(shape), dtype, name='mean')
         self._s = tf.Variable(tf.zeros(shape), dtype, name='s')
 
         self.var = tf.cond(self.n > 1, tf.div(self._s, tf.subtract(self.n, 1)), tf.square(self.mean))
         self.std = tf.sqrt(self.var)
+
+    def _make_set(self, n, mean, var):
+        tf.group(tf.assign(self.n, n),
+                 tf.assign(self.mean, mean),
+                 tf.assign(self._s, var * (n-1)))
 
     def _make_push(self, observation):
         new_n = tf.add(self.n, 1)
@@ -151,7 +155,7 @@ class RunningStatTF(object):
         new_mean = tf.add(self.mean, delta * nb / new_n)
 
         m_b = varb * (nb - 1)
-        new_s = self._s + m_b + tf.square(delta) * tf.multiply(self.n, nb) / new_n
+        new_s = tf.add(self._s, m_b + tf.square(delta) * tf.multiply(self.n, nb) / new_n)
 
         self.push_block = tf.group(tf.assign(self.n, new_n),
                                    tf.assign(self.mean, new_mean),
