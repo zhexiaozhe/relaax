@@ -23,10 +23,11 @@ class ParameterServer(relaax.algorithm_base.parameter_server_base.ParameterServe
         self._session.run(tf.variables_initializer(tf.global_variables()))
 
         if config.use_filter:
-            self.M = np.zeros(config.state_size)
-            self.S = np.zeros(config.state_size)
+            init = np.zeros(config.state_size)
+            global_t = self.global_t()
+            self._filter_state = [global_t, init, init]
 
-        self._bridge = _Bridge(config, metrics, self._network, self._session)
+        self._bridge = _Bridge(config, metrics, self._network, self._session, self._filter_state)
 
     def close(self):
         self._session.close()
@@ -47,11 +48,12 @@ class ParameterServer(relaax.algorithm_base.parameter_server_base.ParameterServe
 
 
 class _Bridge(relaax.algorithm_base.bridge_base.BridgeBase):
-    def __init__(self, config, metrics, network, session):
+    def __init__(self, config, metrics, network, session, filter_state):
         self._config = config
         self._metrics = metrics
         self._network = network
         self._session = session
+        self._filter_state = filter_state
 
     def increment_global_t(self):
         return self._session.run(self._network.increment_global_t)
@@ -65,6 +67,16 @@ class _Bridge(relaax.algorithm_base.bridge_base.BridgeBase):
 
     def get_values(self):
         return self._session.run(self._network.values)
+
+    def get_filter_state(self):
+        return self._filter_state
+
+    def update_filter_state(self, diff):
+        self._filter_state[0] = self._session.run(self._network.global_t)
+        # diff[0]: agent_t, diff[1]: mean_diff, diff[2]: std_diff
+        self._filter_state[1] =\
+            (self._filter_state[1]*self._filter_state[0] + diff[1]) / (self._filter_state[0] + diff[0])
+        self._filter_state[2] += diff[2]
 
     def metrics(self):
         return self._metrics
