@@ -208,8 +208,16 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
 
         if (self.updates_t % 20) == 0:
             print("TIMESTEP", self.local_t)
-            # send current filter state before
-            state = self._parameter_server.get_filter_state()
-            self.obfilter.rs.set(*state)
+
+            if self._config.use_filter:
+                # send accumulated filter statistics to parameter_server
+                timesteps = self.obfilter.rs.n - self.obfilter.rs.old_n
+                mean, std = self.obfilter.rs.get_diff()
+                self._parameter_server.update_filter_state([timesteps, mean, std])
+                print('Filter timesteps', timesteps)
+
+                # get updated filter state from parameter_server
+                state = self._parameter_server.get_filter_state()
+                self.obfilter.rs.set(*state)
 
         self.updates_t += 1

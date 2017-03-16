@@ -87,3 +87,7 @@ class RunningStatExt(RunningStat):
         diffM = self._M*self._n - self._inM*self._inN
         diffS = self._S - self._inS
         return diffM, diffS
+
+    @property
+    def old_n(self):
+        return self._inN
