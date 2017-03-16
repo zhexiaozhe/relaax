@@ -25,6 +25,9 @@ class Config(relaax.algorithm_base.config_base.ConfigBase):
         # it has 2 options for type of loss function: A or B (B is set by default)
         self.loss_type = config.get('loss_type', 'B')
 
+        # whether to do a running average filter of the incoming observations and rewards
+        self.use_filter = config.get('use_filter', True)
+
         # to use GPU, set to the True
         self.use_GPU = config.get('gpu', False)
 

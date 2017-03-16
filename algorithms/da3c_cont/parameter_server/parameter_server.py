@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 import relaax.algorithm_base.bridge_base
 import relaax.algorithm_base.parameter_server_base
@@ -20,6 +21,10 @@ class ParameterServer(relaax.algorithm_base.parameter_server_base.ParameterServe
         )
 
         self._session.run(tf.variables_initializer(tf.global_variables()))
+
+        if config.use_filter:
+            self.M = np.zeros(config.state_size)
+            self.S = np.zeros(config.state_size)
 
         self._bridge = _Bridge(config, metrics, self._network, self._session)
 
