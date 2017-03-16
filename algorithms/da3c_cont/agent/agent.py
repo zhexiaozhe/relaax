@@ -1,7 +1,7 @@
 from __future__ import print_function
 
-import numpy as np
 import tensorflow as tf
+import numpy as np
 import time
 
 import relaax.algorithm_base.agent_base
@@ -9,7 +9,7 @@ import relaax.common.metrics
 import relaax.common.protocol.socket_protocol
 
 from . import network
-from .stats import ZFilter
+from relaax.algorithm_lib.filters import *
 
 
 class Agent(relaax.algorithm_base.agent_base.AgentBase):
@@ -26,6 +26,7 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
 
         self.global_t = 0           # counter for global steps between all agents
         self.local_t = 0            # steps count for current agent's process
+        self.updates_t = 0          # counter for global updates
         self.episode_reward = 0     # score accumulator for current episode
 
         self.states = []            # auxiliary states accumulator through episode_len = 0..5
@@ -39,7 +40,12 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
 
         self.obsQueue = None        # observation accumulator, cuz state = history_len * consecutive observations
         self.obs_size = int(np.prod(np.array(config.state_size)))
-        self.obfilter = ZFilter(tuple([self.obs_size]), clip=5)
+        self.accum_latency = 0
+
+        if config.use_filter:
+            self.obfilter = ZFilter(RunningStatExt(config.state_size), clip=5)
+            state = self._parameter_server.get_filter_state()
+            self.obfilter.rs.set(*state)
 
         self._session = tf.Session()
 
@@ -76,12 +82,15 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         self.actions.append(action)
         self.values.append(value_)
 
+        self.accum_latency += time.time() - start
+
         if (self.local_t % 100) == 0:
             print("mu=", mu_)
             print("sigma=", sig_)
             print(" V=", value_)
             print("action=", action)
-            self.metrics().scalar('server latency', time.time() - start)
+            self.metrics().scalar('server latency', self.accum_latency / 100)
+            self.accum_latency = 0
 
         if self._config.reward_interval and (self.local_t % self._config.reward_interval == 0):
             self.metrics().scalar('episode score', self.episode_reward)
@@ -134,11 +143,14 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         return np.clip(act, self._config.min_value, self._config.max_value)
 
     def _update_state(self, observation):
-        obs = self.obfilter(observation.flatten())
+        obs = observation.flatten()
+        if self._config.use_filter:
+            obs = self.obfilter(obs)
+
         if not self._terminal_end and self.local_t != 0:
             self.obsQueue = np.append(self.obsQueue[self.obs_size:], obs)
         else:
-            self.obsQueue = self.obsQueue = np.repeat(obs, self._config.history_len)
+            self.obsQueue = np.tile(obs, self._config.history_len)
 
     def _update_global(self):
         R = 0.0
@@ -194,5 +206,10 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
             self._session.run(self._local_network.grads, feed_dict=feed_dict)
         )
 
-        if (self.local_t % 100) == 0:
+        if (self.updates_t % 20) == 0:
             print("TIMESTEP", self.local_t)
+            # send current filter state before
+            state = self._parameter_server.get_filter_state()
+            self.obfilter.rs.set(*state)
+
+        self.updates_t += 1

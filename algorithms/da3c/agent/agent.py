@@ -35,7 +35,7 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         self.values = []            # auxiliary values accumulator through episode_len = 0..5
 
         self.episode_t = 0          # episode counter through episode_len = 0..5
-        self.terminal_end = False   # auxiliary parameter to compute R in update_global and frameQueue
+        self._terminal_end = False   # auxiliary parameter to compute R in update_global and frameQueue
         self.start_lstm_state = None
 
         self.obsQueue = None        # observation accumulator for state = history_len * consecutive frames
@@ -52,8 +52,8 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         if self.episode_t == self._config.episode_len:
             self._update_global()
 
-            if self.terminal_end:
-                self.terminal_end = False
+            if self._terminal_end:
+                self._terminal_end = False
 
             self.episode_t = 0
 
@@ -94,7 +94,7 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
     def reward_and_reset(self, reward):
         if not self._reward(reward):
             return None
-        self.terminal_end = True
+        self._terminal_end = True
 
         print("score=", self.episode_reward)
         score = self.episode_reward
@@ -106,7 +106,6 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
             self._local_network.reset_state()
 
         self.episode_t = self._config.episode_len
-
         return score
 
     def metrics(self):
@@ -139,6 +138,14 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
                 return i
         # fail safe
         return len(values) - 1
+
+    @staticmethod
+    def _choose_act(pi_values):
+        # can replace the old one similar method
+        values = np.cumsum(pi_values)
+        total = values[-1]
+        r = np.random.rand() * total
+        return np.searchsorted(values, r)
 
     def _update_state(self, obs):
         axis = len(obs.shape)  # extra dimension for observation
@@ -204,7 +211,6 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
                     self._local_network.td: batch_td,
                     self._local_network.r: batch_R
             }
-
 
         self._parameter_server.apply_gradients(
             self._session.run(self._local_network.grads, feed_dict=feed_dict)
