@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import unittest
 
 from relaax.server.common.saver import saver, limited_saver

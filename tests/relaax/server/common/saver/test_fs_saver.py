@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import contextlib
 import shutil
 import tempfile
