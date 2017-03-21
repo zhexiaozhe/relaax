@@ -57,12 +57,12 @@ class RunningStat(object):
         return self._M
 
     @property
-    def var(self):
+    def variance(self):
         return self._S/(self._n - 1) if self._n > 1 else np.square(self._M)
 
     @property
     def std(self):
-        return np.sqrt(self.var)
+        return np.sqrt(self.variance)
 
     @property
     def shape(self):
@@ -98,6 +98,72 @@ class RunningStatExt(RunningStat):
 # zf = ZFilterTF(state_placeholder, rs, push_x=True)
 
 
+class RunningStatTF(object):
+    def __init__(self):
+        self.n = None
+        self.assign = None
+
+    def make_assign(self, n, mean, variance):
+        self._make_state(mean.get_shape(), mean.dtype)
+
+        return tf.group(
+            tf.assign(self.n   , n                                        ),
+            tf.assign(self.mean, mean                                     ),
+            tf.assign(self._s  , variance * tf.cast(n - 1, variance.dtype))
+        )
+
+    def make_push(self, observation):
+        self._make_state(observation.get_shape(), observation.dtype)
+
+        new_n = self.n + 1
+        new_m = (
+            self.mean                                                   +
+            (observation - self.mean) / tf.cast(new_n, self.mean.dtype)
+        )
+        new_s = self._s + (observation - self.mean) * (observation - new_m)
+        return tf.group(
+            tf.assign(self.n   , new_n),
+            tf.assign(self.mean, new_m),
+            tf.assign(self._s  , new_s)
+        )
+
+    def make_push_block(self, nb, meanb, varb):
+        dtype = meanb.dtype
+        self._make_state(meanb.get_shape(), dtype)
+
+        new_n = self.n + nb
+
+        delta = meanb - self.mean
+        new_mean = self.mean + delta * tf.cast(nb, dtype) / tf.cast(new_n, dtype)
+
+        m_b = varb * tf.cast(nb - 1, dtype)
+        c = tf.cast(self.n, dtype) * tf.cast(nb, dtype) / tf.cast(new_n, dtype)
+        new_s = self._s + m_b + tf.square(delta) * c
+
+        return tf.group(
+            tf.assign(self.n   , new_n   ),
+            tf.assign(self.mean, new_mean),
+            tf.assign(self._s  , new_s   )
+        )
+
+    def _make_state(self, shape, dtype):
+        if self.n is None:
+            # TODO: mark as nontrainable
+            self.n    = tf.Variable(tf.constant(0, tf.int64), tf.int64, name='n'   )
+            self.mean = tf.Variable(tf.zeros(shape, dtype)  , dtype   , name='mean')
+            self._s   = tf.Variable(tf.zeros(shape, dtype)  , dtype   , name='s'   )
+
+            self.variance = tf.cond(
+                self.n > 1,
+                lambda: self._s / tf.cast(self.n - 1, dtype),
+                lambda: tf.zeros(shape, dtype)
+            )
+            self.std = tf.sqrt(self.variance)
+        else:
+            assert shape == self.mean.get_shape()
+            assert dtype == self.mean.dtype.base_dtype
+
+
 class ZFilterTF(object):
     """ y = (x-mean)/std using running estimates of mean, std """
     def __init__(self, x, rs, push_x=True, demean=True, destd=True, clip=None):
@@ -112,62 +178,3 @@ class ZFilterTF(object):
         if clip is not None:
             xx = tf.clip_by_value(xx, -clip, clip)
         self.result = xx
-
-
-class RunningStatTF(object):
-    def make_assign(self, n, mean, var):
-        assert self.assign is None
-
-        self._make_state(mean.get_shape(), mean.dtype)
-
-        self.assign = tf.group(tf.assign(self.n, n),
-                               tf.assign(self.mean, mean),
-                               tf.assign(self._s, var * (n-1)))
-
-        return self
-
-    def make_push(self, observation):
-        assert self.push is None
-
-        self._make_state(observation.get_shape(), observation.dtype)
-
-        new_n = tf.add(self.n, 1)
-        new_m = tf.add(self.mean, (observation - self.mean) / new_n)
-        new_s = tf.add(self._s, (observation - self.mean) * (observation - new_m))
-        self.push = tf.group(tf.assign(self.n, new_n),
-                             tf.assign(self.mean, new_m),
-                             tf.assign(self._s, new_s))
-
-        return self
-
-    def make_push_block(self, nb, meanb, varb):
-        assert self.push_block is None
-
-        self._make_state(meanb.get_shape(), meanb.dtype)
-
-        new_n = tf.add(self.n, nb)
-
-        delta = tf.subtract(meanb, self.mean)
-        new_mean = tf.add(self.mean, delta * nb / new_n)
-
-        m_b = varb * (nb - 1)
-        new_s = tf.add(self._s, m_b + tf.square(delta) * tf.multiply(self.n, nb) / new_n)
-
-        self.push_block = tf.group(tf.assign(self.n, new_n),
-                                   tf.assign(self.mean, new_mean),
-                                   tf.assign(self._s, new_s))
-
-        return self
-
-    def _make_state(self, shape, dtype):
-        if self.n is None:
-            # TODO: mark as nontrainable
-            self.n = tf.Variable(0, tf.int64, name='n')
-            self.mean = tf.Variable(tf.zeros(shape), dtype, name='mean')
-            self._s = tf.Variable(tf.zeros(shape), dtype, name='s')
-
-            self.var = tf.cond(self.n > 1, tf.div(self._s, tf.subtract(self.n, 1)), tf.square(self.mean))
-            self.std = tf.sqrt(self.var)
-        else:
-            assert shape == self.mean.get_shape()
-            assert dtype == self.mean.dtype
