@@ -144,3 +144,38 @@ class Agent(relaax.algorithm_base.agent_base.AgentBase):
         # Computes difference from the previous observation (motion-like process)
         self.prev_state = state - self.prev_state
         return self.prev_state
+
+
+class DiscountedReward(object):
+    def __init__(self, gamma_):
+        # Define auxiliary variables & interfaces
+        ph_rewards = tf.placeholder(tf.float32, [None, 1], name='ph_rewards')
+        ph_results = tf.placeholder(tf.float32, [None, 1], name='ph_results')
+        ph_length = tf.placeholder(tf.int32, name='ph_length')
+        index = tf.constant(0, name='inner_loop_index')
+        gamma = tf.constant(gamma_, name='discount_factor')     # 0.99
+        running_add = tf.constant(0.0, name='running_add')
+        self.inputs = [ph_rewards, ph_length, ph_results]
+
+        # Define two necessary functions for tf.while_loop: condition & body
+        loop_condition = lambda idx, r_add, results: tf.less(idx, ph_length)
+
+        def loop_body(idx, r_add, results):
+            i = ph_length - idx - 1     # replace further for convenience
+            r_add = r_add * gamma + ph_rewards[i][0]
+            results += tf.scatter_nd([[i, 0]], [r_add], shape=[ph_length, 1])
+            return tf.add(idx, 1), r_add, results
+
+        self.loop = tf.while_loop(loop_condition, loop_body,
+                                  loop_vars=[index, running_add, ph_results])
+
+    def __call__(self, sess, rewards, normalize=True):
+        rewards = np.vstack(rewards).astype(np.float32)
+        feeds = {self.inputs[0]: rewards,
+                 self.inputs[1]: rewards.shape[0],
+                 self.inputs[2]: np.zeros_like(rewards)}
+        result = sess.run(self.loop, feed_dict=feeds)[-1]
+        if normalize:
+            result -= np.mean(result)
+            result /= np.std(result) + 1e-20
+        return result
