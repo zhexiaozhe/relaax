@@ -179,3 +179,28 @@ class DiscountedReward(object):
             result -= np.mean(result)
             result /= np.std(result) + 1e-20
         return result
+
+
+class DiscountedRewardTFOP(object):
+    def __init__(self, gamma_):
+        # Define auxiliary variables & interfaces
+        cur_reward = tf.placeholder(tf.float32, name='current_reward')
+        running_add = tf.placeholder(tf.float32, name='running_add')
+        gamma = tf.constant(gamma_, name='discount_factor')  # 0.99
+        self.inputs = [cur_reward, running_add]
+
+        self.compute = running_add * gamma + cur_reward
+
+    def __call__(self, sess, rewards, normalize=True):
+        rewards = np.vstack(rewards).astype(np.float32)
+        result = np.zeros_like(rewards)
+        print(result.shape)
+        result[-1] = rewards[-1]
+        for i in reversed(range(0, rewards.shape[0]-1)):
+            feeds = {self.inputs[0]: rewards[i][0],
+                     self.inputs[1]: result[i+1][0]}
+            result[i] = sess.run(self.compute, feed_dict=feeds)
+        if normalize:
+            result -= np.mean(result)
+            result /= np.std(result) + 1e-20
+        return result
