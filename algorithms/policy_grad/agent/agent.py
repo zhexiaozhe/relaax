@@ -225,5 +225,10 @@ class DiscountedRewardM(object):
         self.index = tf.placeholder(tf.int32, name='slice_index')
         self.compute = tf.matmul(operator[:self.index, :self.index], self.ph_rewards)
 
-    def __call__(self, sess, rewards):
+        mean_centered = self.compute - tf.reduce_mean(self.compute)
+        self.normalize = mean_centered / tf.sqrt(tf.nn.moments(mean_centered, axes=[0])[1])
+
+    def __call__(self, sess, rewards, normalize=False):
+        if normalize:
+            return sess.run(self.normalize, feed_dict={self.ph_rewards: rewards, self.index: rewards.shape[0]})
         return sess.run(self.compute, feed_dict={self.ph_rewards: rewards, self.index: rewards.shape[0]})
