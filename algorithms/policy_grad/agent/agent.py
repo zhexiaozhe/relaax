@@ -204,3 +204,25 @@ class DiscountedRewardTFOP(object):
             result -= np.mean(result)
             result /= np.std(result) + 1e-20
         return result
+
+
+class DiscountedRewardM(object):
+    # with fixed batch size for now --> to test
+    def __init__(self, gamma_, size_):
+        # Define auxiliary variables & interfaces
+        powers = np.power(np.ones(size_) * gamma_, np.arange(size_))
+        result = np.zeros((size_, size_))
+        for i in range(size_):
+            result[i, i:] = powers[:size_-i]
+        operator = tf.Variable(
+            result,
+            # np.fliplr(np.triu(np.tile(np.vstack(np.power(np.ones(size_) * gamma_, np.arange(size_))), (1, size_)))),
+            # np.tril(np.tile(np.power(np.ones(size_) * gamma_, np.arange(size_)), (size_, 1))),
+            # np.triu(np.vstack((np.ones(size_), np.ones((size_-1, size_))*gamma_))),
+            name='gamma_operator', dtype=np.float32
+        )
+        self.ph_rewards = tf.placeholder(tf.float32, [None, 1], name='ph_rewards')
+        self.compute = tf.matmul(operator, self.ph_rewards)
+
+    def __call__(self, sess, rewards):
+        return sess.run(self.compute, feed_dict={self.ph_rewards: rewards})
