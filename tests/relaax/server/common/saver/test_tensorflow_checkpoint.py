@@ -55,8 +55,6 @@ class TestTensorflowCheckpoint(unittest.TestCase):
             'other_file_name'
         ], 112))
 
-    def checkpoint_names(self, names, checkpoint_id):
-
     def test_save_restore(self):
         self._set(14)
         self.checkpoint.save_checkpoint(self.session, 114)
