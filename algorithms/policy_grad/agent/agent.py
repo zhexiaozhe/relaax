@@ -222,7 +222,7 @@ class DiscountedRewardM(object):
             name='gamma_operator', dtype=np.float32
         )
         self.ph_rewards = tf.placeholder(tf.float32, [None, 1], name='ph_rewards')
-        self.index = tf.placeholder(tf.int32, name='slice_index')
+        self.index = tf.placeholder(tf.int32, [1], name='slice_index')
         self.compute = tf.matmul(operator[:self.index, :self.index], self.ph_rewards)
 
         mean_centered = self.compute - tf.reduce_mean(self.compute)
