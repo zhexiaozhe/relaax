@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import unittest
 
-from relaax.algorithm_lib.filters import RunningStatTF
+from relaax.algorithm_lib.filters import RunningStatTF, ZFilterTF
 
 
 class TestRunningStatTF(unittest.TestCase):
@@ -184,14 +184,84 @@ class TestRunningStatTF(unittest.TestCase):
 
 
 class TestZFilterTF(unittest.TestCase):
+
+    SAMPLES = [
+        [ 6, 12],
+        [12, 24],
+        [18, 36],
+        [24, 48],
+        [30, 60],
+        [36, 72]
+    ]
+
     def setUp(self):
-        pass
+        tf.reset_default_graph()
+        self.session = tf.Session()
 
     def tearDown(self):
-        pass
+        self.session.close()
+        tf.reset_default_graph()
 
-    def test_(self):
-        pass
+    def test_ident(self):
+        self.check_ident(tf.float32)
+        self.check_ident(tf.float64)
+
+    def test_demean(self):
+        self.check_demean(tf.float32)
+        self.check_demean(tf.float64)
+
+    def test_demean_destd(self):
+        self.check_demean_destd(tf.float32)
+        self.check_demean_destd(tf.float64)
+
+    def check_ident(self, dtype):
+        x = tf.placeholder(dtype, shape=(2, ))
+        rs = RunningStatTF()
+        push = rs.make_push(x)
+        zf = ZFilterTF(x, rs, demean=False, destd=False)
+
+        self.session.run([tf.global_variables_initializer()])
+
+        for i in xrange(len(self.SAMPLES)):
+            _, xx = self.session.run([push, zf.result], feed_dict={ x: self.SAMPLES[i] })
+            self.assertEquals(xx.tolist(), self.SAMPLES[i])
+
+    def check_demean(self, dtype):
+        x = tf.placeholder(dtype, shape=(2, ))
+        rs = RunningStatTF()
+        push = rs.make_push(x)
+        zf = ZFilterTF(x, rs, demean=True, destd=False)
+
+        self.session.run([tf.global_variables_initializer()])
+
+        for i in xrange(len(self.SAMPLES)):
+            self.session.run([push], feed_dict={ x: self.SAMPLES[i] })
+            xx, = self.session.run([zf.result], feed_dict={ x: self.SAMPLES[i] })
+            self.assertEquals(xx.tolist(), self.filter_(self.SAMPLES[i], rs, demean=True, destd=False))
+
+    def check_demean_destd(self, dtype):
+        x = tf.placeholder(dtype, shape=(2, ))
+        rs = RunningStatTF()
+        push = rs.make_push(x)
+        zf = ZFilterTF(x, rs, demean=True, destd=True)
+
+        self.session.run([tf.global_variables_initializer()])
+
+        for i in xrange(len(self.SAMPLES)):
+            self.session.run([push], feed_dict={ x: self.SAMPLES[i] })
+            xx, = self.session.run([zf.result], feed_dict={ x: self.SAMPLES[i] })
+            self.assertEqual(len(xx.tolist()), len(self.filter_(self.SAMPLES[i], rs, demean=True, destd=True)))
+            for a, b in zip(xx.tolist(), self.filter_(self.SAMPLES[i], rs, demean=True, destd=True)):
+                self.assertAlmostEqual(a, b, delta=10**-6)
+
+    def filter_(self, x, rs, demean=True, destd=True):
+        n, mean, std = self.session.run([rs.n, rs.mean, rs.std])
+        xx = x
+        if demean:
+            xx = [x - m for x, m in zip(xx, mean)]
+        if destd and n > 1:
+            xx = [x / s for x, s in zip(xx, std)]
+        return xx
 
 
 if __name__ == '__main__':

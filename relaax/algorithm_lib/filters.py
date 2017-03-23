@@ -94,8 +94,9 @@ class RunningStatExt(RunningStat):
         return self._inN
 
 
-# rs = RunningStatTF().make_push(state_placeholder)
-# zf = ZFilterTF(state_placeholder, rs, push_x=True)
+# rs = RunningStatTF()
+# push = rs.make_push(x)
+# zf = ZFilterTF(x, rs, push=push)
 
 
 class RunningStatTF(object):
@@ -166,15 +167,16 @@ class RunningStatTF(object):
 
 class ZFilterTF(object):
     """ y = (x-mean)/std using running estimates of mean, std """
-    def __init__(self, x, rs, push_x=True, demean=True, destd=True, clip=None):
+    def __init__(self, x, rs, demean=True, destd=True, clip=None):
         xx = x
-        if push_x:
-            with tf.control_dependencies(rs.push):
-                xx = tf.identity(xx)
         if demean:
-            xx = tf.subtract(xx, rs.mean)
+            xx = xx - rs.mean
         if destd:
-            xx = tf.divide(xx, rs.std)
+            xx = tf.cond(
+                rs.n > 1,
+                lambda: xx / rs.std,
+                lambda: tf.zeros(x.get_shape(), x.dtype)
+            )
         if clip is not None:
             xx = tf.clip_by_value(xx, -clip, clip)
         self.result = xx
