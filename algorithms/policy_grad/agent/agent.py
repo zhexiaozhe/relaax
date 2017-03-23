@@ -222,7 +222,8 @@ class DiscountedRewardM(object):
             name='gamma_operator', dtype=np.float32
         )
         self.ph_rewards = tf.placeholder(tf.float32, [None, 1], name='ph_rewards')
-        self.compute = tf.matmul(operator, self.ph_rewards)
+        self.index = tf.placeholder(tf.int32, name='slice_index')
+        self.compute = tf.matmul(operator[:self.index, :self.index], self.ph_rewards)
 
     def __call__(self, sess, rewards):
-        return sess.run(self.compute, feed_dict={self.ph_rewards: rewards})
+        return sess.run(self.compute, feed_dict={self.ph_rewards: rewards, self.index: rewards.shape[0]})
