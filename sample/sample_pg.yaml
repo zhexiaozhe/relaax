@@ -31,8 +31,9 @@ algorithm:
   use_system_ps: false
 
   action_size: 2                  # action size for the given environment
-  state_shape: [3]                # array of dimensions for the input observation
+  state_shape: [2]                # array of dimensions for the input observation
   hidden_layers: [200,400,200]
+  batch_size: 10
   history_len: 1                  # number of observations to stack in state
   episode_len: 5                  # local loop size for one episode
   gpu: false                      # to use GPU, set to the True
