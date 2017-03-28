@@ -13,6 +13,8 @@ def choose_action(probabilities):
 
 # run agent's policy and get action
 def action_from_policy(obj, state):
-    action_probabilities = obj.sess.run(
-        obj.nn.policy, feed_dict={obj.nn.state: [state]})
+    action_probabilities, = obj.sess.run(
+        [obj.nn.policy],
+        feed_dict={obj.nn.state: [state]}
+    )
     return action_probabilities
