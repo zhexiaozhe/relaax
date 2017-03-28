@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 from pg_config import config
@@ -75,8 +76,10 @@ class PGAgent(object):
             self.episode_t += 1
             return None
 
-        state = state.flatten()
+        state = np.asarray(state).flatten()
         probs = action_from_policy(self, state)
+        assert probs.shape == (1, config.state_size)
+        probs, = probs
 
         # accumulate experience & retrieve action as simple number
         action = accumulate(self, state, reward, probs)
