@@ -10,6 +10,7 @@ def update_shared_parameters(obj, partial_gradients):
         feed_dict={"gradients": partial_gradients}
     )
 
+
 # reload policy weights from PS
 def load_shared_parameters(obj):
     weights, = obj.ps.run(["weights"])
