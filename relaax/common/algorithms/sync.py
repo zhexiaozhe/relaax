@@ -6,12 +6,14 @@ from __future__ import print_function
 # update PS with leaned policy
 def update_shared_parameters(obj, partial_gradients):
     obj.ps.run(
-        "apply_gradients", feed_dict={"gradients": partial_gradients})
-
+        ["apply_gradients"],
+        feed_dict={"gradients": partial_gradients}
+    )
 
 # reload policy weights from PS
 def load_shared_parameters(obj):
-    weights = obj.ps.run("weights")
+    weights, = obj.ps.run(["weights"])
     obj.sess.run(
         obj.nn.assign_weights,
-        feed_dict={obj.nn.shared_wights: weights})
+        feed_dict={k: v for k, v in zip(obj.nn.shared_weights, weights)}
+    )
