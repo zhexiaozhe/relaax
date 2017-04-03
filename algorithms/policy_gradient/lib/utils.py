@@ -23,13 +23,19 @@ def discounted_reward(rewards, gamma):
     return discounted_reward
 
 
-def choose_action(probabilities):
+def choose_action(probabilities, cnt, limit=2000):
+    if cnt < limit:
+        return softmax_action(probabilities)
+    return argmax_action(probabilities)
+
+
+def softmax_action(probabilities):
     values = np.cumsum(probabilities)
     r = np.random.rand() * values[-1]
     return np.searchsorted(values, r)
 
 
-def choose_max_action(probabilities):
+def argmax_action(probabilities):
     return np.argmax(probabilities)
 
 

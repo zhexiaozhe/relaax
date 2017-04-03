@@ -1,7 +1,7 @@
 from relaax.server.common.session import Session
 
 from lib.experience import Experience
-from lib.utils import discounted_reward, choose_action, choose_max_action
+from lib.utils import discounted_reward, choose_action
 
 from pg_config import config
 from pg_model import PolicyModel
@@ -22,6 +22,7 @@ class PGAgent(object):
         self.exploit = exploit
         # count global steps between all agents
         self.global_t = 0
+        self.episode_cnt = 0
         # experience accumulated through episode
         self.experience = Experience(config.action_size)
         # reset variables used
@@ -111,7 +112,7 @@ class PGAgent(object):
             [self.sess.graph.policy],
             feed_dict={self.sess.graph.state: [state]}
         )
-        return choose_action(action_probabilities)
+        return choose_action(action_probabilities, self.episode_cnt)
 
     # train policy with accumulated states, rewards and actions
     def train_policy(self):
