@@ -22,7 +22,6 @@ class PGAgent(object):
         self.exploit = exploit
         # count global steps between all agents
         self.global_t = 0
-        self.episode_cnt = 0
         # experience accumulated through episode
         self.experience = Experience(config.action_size)
         # reset variables used
@@ -112,10 +111,7 @@ class PGAgent(object):
             [self.sess.graph.policy],
             feed_dict={self.sess.graph.state: [state]}
         )
-        if self.episode_cnt < 200:
-            return choose_action(action_probabilities)
-        else:
-            return choose_max_action(action_probabilities)
+        return choose_action(action_probabilities)
 
     # train policy with accumulated states, rewards and actions
     def train_policy(self):
