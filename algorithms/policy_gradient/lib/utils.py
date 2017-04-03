@@ -23,10 +23,10 @@ def discounted_reward(rewards, gamma):
     return discounted_reward
 
 
-def choose_action(probabilities, cnt, limit=2000):
-    if cnt < limit:
-        return softmax_action(probabilities)
-    return argmax_action(probabilities)
+def choose_action(probabilities, greedy):
+    if greedy:
+        return argmax_action(probabilities)
+    return softmax_action(probabilities)
 
 
 def softmax_action(probabilities):

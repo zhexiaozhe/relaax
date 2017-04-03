@@ -6,6 +6,8 @@ from lib.utils import discounted_reward, choose_action
 from pg_config import config
 from pg_model import PolicyModel
 
+from collections import deque
+
 
 # PGAgent implements training regime for Policy Gradient algorithm
 # If exploit on init set to True, agent will run in exploitation regime:
@@ -22,7 +24,9 @@ class PGAgent(object):
         self.exploit = exploit
         # count global steps between all agents
         self.global_t = 0
-        self.episode_cnt = 0
+        # auxiliary
+        self.last_avg5_rewards = deque(maxlen=5)
+        self.last_avg5_rewards.append(0)
         # experience accumulated through episode
         self.experience = Experience(config.action_size)
         # reset variables used
@@ -57,7 +61,6 @@ class PGAgent(object):
     # environment is asking to reset agent
     def reset(self):
         self.reset_episode()
-        self.episode_cnt += 1
         return True
 
 # Episode states
@@ -86,6 +89,7 @@ class PGAgent(object):
         if (self.episode_t > 1) and (not self.exploit):
             partial_gradients = self.train_policy()
             self.update_shared_parameters(partial_gradients)
+        self.last_avg5_rewards.append(self.episode_reward)
         self.reset_episode()
 
     # reset training auxiliary counters and accumulators
@@ -112,7 +116,8 @@ class PGAgent(object):
             [self.sess.graph.policy],
             feed_dict={self.sess.graph.state: [state]}
         )
-        return choose_action(action_probabilities, self.episode_cnt)
+        return choose_action(action_probabilities,
+                             (sum(self.last_avg5_rewards)/len(self.last_avg5_rewards)) > 50)
 
     # train policy with accumulated states, rewards and actions
     def train_policy(self):
