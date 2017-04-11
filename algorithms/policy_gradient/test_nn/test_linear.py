@@ -100,25 +100,33 @@ def run(hidden_sizes):
     sess = session.Session(model)
     sess.op_initialize()
     loss_error = 0
+    loss_random = 0
 
     for i in range(EPOCHS):
         states = np.random.randn(BATCH_SIZE, STATE_SIZE)
         target_s = np.vstack(np.sin(np.sum(states[:, :2], axis=1)))
         target_c = np.vstack(np.cos(np.sum(states[:, 2:], axis=1)))
+
         target = np.zeros((BATCH_SIZE, ACTION_SIZE))
+        random = np.zeros((BATCH_SIZE, ACTION_SIZE))
         for v in range(BATCH_SIZE):
             idx = 0 if target_s[v] > target_c[v] else 1
             target[v, idx] = 1
+            random[v, np.random.randint(2)] = 1
+
         act_probs = sess.op_get_action(state=states)   # states
         #actions = np.zeros((BATCH_SIZE, ACTION_SIZE))
         #for v in range(BATCH_SIZE):
         #    idx = int(choose_action(act_probs[v]))
         #    actions[v, idx] = 1
         loss_error += np.sum(np.square(target - act_probs))  # actions
+        loss_random += np.sum(np.square(random - act_probs))
         #print('Test', act_probs)
+
         apply_gradients(sess, (compute_gradients(sess, states, target)))
 
-    print('Model {} loss error: {}'.format(hidden_sizes, loss_error))
+    print('Model {} loss error: {} | random {}'.
+          format(hidden_sizes, loss_error, loss_random))
 
 if __name__ == '__main__':
     run(HIDDEN_1)
