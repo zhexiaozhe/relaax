@@ -94,9 +94,10 @@ def run(hidden_sizes):
 
     for i in range(EPOCHS):
         states = np.random.randint(2, size=(BATCH_SIZE, STATE_SIZE))
-        act_probs = sess.op_get_action(state=states)
-        print('Test', act_probs)
-        model.apply_gradients(model.compute_gradients(sess, states, act_probs))
+        target = np.vstack(np.remainder(np.sum(states, axis=1), 2))
+        #act_probs = sess.op_get_action(state=states)
+        #print('Test', act_probs)
+        model.apply_gradients(model.compute_gradients(sess, states, target))
 
     print('Model {} loss error:'.format(hidden_sizes))
 
