@@ -16,7 +16,7 @@ HIDDEN_2 = [10]  # hidden_sizes
 
 BATCH_SIZE = 10  # batch_size
 LEARN_RATE = 1e-2
-EPOCHS = 10
+EPOCHS = 10**4
 
 
 class DiffLoss(subgraph.Subgraph):
@@ -88,6 +88,11 @@ def apply_gradients(sess, gradients):
     sess.op_apply_gradients(gradients=gradients)
 
 
+def choose_action(probabilities):
+    # one more better variant
+    return np.random.choice(probabilities, p=probabilities)
+
+
 def run(hidden_sizes):
     # Build TF graph
     model = Model(hidden_sizes)
@@ -105,7 +110,11 @@ def run(hidden_sizes):
             idx = 0 if target_s[v] > target_c[v] else 1
             target[v, idx] = 1
         act_probs = sess.op_get_action(state=states)   # states
-        loss_error += np.sum(np.abs(target - act_probs))
+        #actions = np.zeros((BATCH_SIZE, ACTION_SIZE))
+        #for v in range(BATCH_SIZE):
+        #    idx = int(choose_action(act_probs[v]))
+        #    actions[v, idx] = 1
+        loss_error += np.sum(np.square(target - act_probs))  # actions
         #print('Test', act_probs)
         apply_gradients(sess, (compute_gradients(sess, states, target)))
 
