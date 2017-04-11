@@ -133,6 +133,8 @@ class FullyConnected(subgraph.Subgraph):
         last = state.node
         for w in weights.node:
             last = tf.nn.relu(tf.matmul(last, w))
+        if last.get_shape().as_list()[-1] == 1:
+            return tf.nn.sigmoid(last)
         return tf.nn.softmax(last)
 
 
