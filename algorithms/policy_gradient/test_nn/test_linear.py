@@ -8,11 +8,11 @@ from relaax.common.algorithms import subgraph
 import graph
 from relaax.server.common import session
 
-STATE_SIZE = 2   # state_size
-ACTION_SIZE = 1  # action_size
+STATE_SIZE = 4   # state_size
+ACTION_SIZE = 2  # action_size
 
 HIDDEN_1 = []    # hidden_sizes
-HIDDEN_2 = [2]   # hidden_sizes
+HIDDEN_2 = [10]  # hidden_sizes
 
 BATCH_SIZE = 10  # batch_size
 LEARN_RATE = 1e-2
@@ -21,7 +21,7 @@ EPOCHS = 10
 
 class DiffLoss(subgraph.Subgraph):
     def build_graph(self, action, network):
-        return tf.reduce_sum(tf.abs(action.node - network.node), axis=[1])
+        return tf.reduce_sum(tf.square(action.node - network.node), axis=[1])
 
 
 class Policy(subgraph.Subgraph):
@@ -74,16 +74,18 @@ class Model(subgraph.Subgraph):
         self.op_apply_gradients = sg_apply_gradients.apply_gradients(ph_gradients)
         self.op_initialize = sg_initialize.initialize()
 
-    # computes gradients
-    def compute_gradients(self, sess, states, actions):
-        return sess.op_compute_gradients(
-            state=states,
-            action=actions
-        )
 
-    # applies gradients
-    def apply_gradients(self, gradients):
-        self.op_apply_gradients(gradients=gradients)
+# computes gradients
+def compute_gradients(sess, states, actions):
+    return sess.op_compute_gradients(
+        state=states,
+        action=actions
+    )
+
+
+# applies gradients
+def apply_gradients(sess, gradients):
+    sess.op_apply_gradients(gradients=gradients)
 
 
 def run(hidden_sizes):
@@ -91,15 +93,23 @@ def run(hidden_sizes):
     model = Model(hidden_sizes)
     # Initialize TF
     sess = session.Session(model)
+    sess.op_initialize()
+    loss_error = 0
 
     for i in range(EPOCHS):
-        states = np.random.randint(2, size=(BATCH_SIZE, STATE_SIZE))
-        target = np.vstack(np.remainder(np.sum(states, axis=1), 2))
-        #act_probs = sess.op_get_action(state=states)
+        states = np.random.randn(BATCH_SIZE, STATE_SIZE)
+        target_s = np.vstack(np.sin(np.sum(states[:, :2], axis=1)))
+        target_c = np.vstack(np.cos(np.sum(states[:, 2:], axis=1)))
+        target = np.zeros((BATCH_SIZE, ACTION_SIZE))
+        for v in range(BATCH_SIZE):
+            idx = 0 if target_s[v] > target_c[v] else 1
+            target[v, idx] = 1
+        act_probs = sess.op_get_action(state=states)   # states
+        loss_error += np.sum(np.abs(target - act_probs))
         #print('Test', act_probs)
-        model.apply_gradients(model.compute_gradients(sess, states, target))
+        apply_gradients(sess, (compute_gradients(sess, states, target)))
 
-    print('Model {} loss error:'.format(hidden_sizes))
+    print('Model {} loss error: {}'.format(hidden_sizes, loss_error))
 
 if __name__ == '__main__':
     run(HIDDEN_1)
