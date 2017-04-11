@@ -6,8 +6,8 @@ import random
 def policy_gradient(num_layers=0):
     with tf.variable_scope("policy"):
         if num_layers:
-            params = tf.get_variable("input_hidden", [2, 4])
-            layer = tf.get_variable("hiddenn_output", [4, 1])
+            params = tf.get_variable("input_hidden", [2, 2])
+            layer = tf.get_variable("hiddenn_output", [2, 1])
         else:
             params = tf.get_variable("policy_parameters", [2, 1])
 
@@ -18,7 +18,7 @@ def policy_gradient(num_layers=0):
         if num_layers:
             linear = tf.nn.relu(linear)
             linear = tf.matmul(linear, layer)
-        probabilities = tf.nn.softmax(linear)
+        probabilities = tf.nn.sigmoid(linear)
 
         good_probabilities = tf.reduce_sum(probabilities, reduction_indices=[1])
         log_like = tf.log(good_probabilities)
@@ -53,7 +53,7 @@ def run_episode(policy_grad, sess):
         # calculate policy
         obs_vector = np.expand_dims(observation, axis=0)
         probs = sess.run(pl_calculated, feed_dict={pl_state: obs_vector})
-        action = 0 if random.uniform(0, 1) < probs[0] else 1
+        action = 0 if random.uniform(0, 1) > probs[0] else 1
         # record the transition
         states.append(observation)
         actions.append([action])
