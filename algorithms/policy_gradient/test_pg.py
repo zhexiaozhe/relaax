@@ -21,7 +21,7 @@ def policy_gradient(num_layers=0):
             linear = tf.matmul(linear, layer)
         probs = tf.nn.sigmoid(linear)
 
-        good_probabilities = actions * (actions - probs) + (1 - actions) * (probs - actions)
+        good_probabilities = tf.square(actions - probs)
         #good_probabilities = tf.reduce_sum(probs, reduction_indices=[1])
         log_like = tf.log(good_probabilities)
         eligibility = log_like * advantages
