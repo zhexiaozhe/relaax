@@ -99,8 +99,8 @@ def run(hidden_sizes):
     # Initialize TF
     sess = session.Session(model)
     sess.op_initialize()
-    loss_error = 0
-    loss_random = 0
+    loss_error, last_error = 0, 0
+    loss_random, last_random = 0, 0
 
     for i in range(EPOCHS):
         states = np.random.randn(BATCH_SIZE, STATE_SIZE)
@@ -119,14 +119,19 @@ def run(hidden_sizes):
         #for v in range(BATCH_SIZE):
         #    idx = int(choose_action(act_probs[v]))
         #    actions[v, idx] = 1
-        loss_error += np.sum(np.square(target - act_probs))  # actions
-        loss_random += np.sum(np.square(random - act_probs))
+
+        last_error = np.sum(np.square(target - act_probs))  # actions
+        loss_error += last_error
+        last_random = np.sum(np.square(random - act_probs))
+        loss_random += last_random
         #print('Test', act_probs)
 
         apply_gradients(sess, (compute_gradients(sess, states, target)))
 
     print('Model {} loss error: {} | random {}'.
           format(hidden_sizes, loss_error, loss_random))
+    print('Model {} last error: {} | random {}'.
+          format(hidden_sizes, last_error, last_random))
 
 if __name__ == '__main__':
     run(HIDDEN_1)
