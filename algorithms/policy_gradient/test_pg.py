@@ -12,21 +12,23 @@ def policy_gradient(num_layers=0):
             params = tf.get_variable("policy_parameters", [2, 1])
 
         state = tf.placeholder("float", [None, 2])
+        actions = tf.placeholder("float", [None, 1])
         advantages = tf.placeholder("float", [None, 1])
 
         linear = tf.matmul(state, params)
         if num_layers:
             linear = tf.nn.relu(linear)
             linear = tf.matmul(linear, layer)
-        probabilities = tf.nn.sigmoid(linear)
+        probs = tf.nn.sigmoid(linear)
 
-        good_probabilities = tf.reduce_sum(probabilities, reduction_indices=[1])
+        good_probabilities = actions * (actions - probs) + (1 - actions) * (probs - actions)
+        #good_probabilities = tf.reduce_sum(probs, reduction_indices=[1])
         log_like = tf.log(good_probabilities)
         eligibility = log_like * advantages
         loss = -tf.reduce_sum(eligibility)
 
         optimizer = tf.train.AdamOptimizer(0.01).minimize(loss)
-        return probabilities, state, advantages, optimizer, log_like
+        return probs, state, actions, advantages, optimizer, log_like
 
 
 def step(action, old_observation):
@@ -41,7 +43,7 @@ def step(action, old_observation):
 
 
 def run_episode(policy_grad, sess):
-    pl_calculated, pl_state, pl_advantages, pl_optimizer, log_like = policy_grad
+    pl_calculated, pl_state, pl_actions, pl_advantages, pl_optimizer, log_like = policy_grad
     observation = np.random.randint(2, size=2)
     totalreward = 0
     states = []
@@ -76,8 +78,9 @@ def run_episode(policy_grad, sess):
         advantages.append(future_reward)
 
     advantages_vector = np.expand_dims(advantages, axis=1)
-    sess.run(pl_optimizer, feed_dict={pl_state: states, pl_advantages: advantages_vector})
-
+    sess.run(pl_optimizer, feed_dict={pl_state: states,
+                                      pl_advantages: advantages_vector,
+                                      pl_actions: actions})
     return totalreward
 
 
