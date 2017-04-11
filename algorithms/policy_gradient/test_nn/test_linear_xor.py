@@ -21,7 +21,7 @@ EPOCHS = 10**4
 
 class DiffLoss(subgraph.Subgraph):
     def build_graph(self, action, network):
-        return tf.reduce_sum(tf.square(action.node - network.node), axis=[1])
+        return tf.reduce_sum(tf.square(action.node - network.node))
 
 
 class Policy(subgraph.Subgraph):
