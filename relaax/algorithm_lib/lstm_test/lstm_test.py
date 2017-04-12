@@ -23,6 +23,11 @@ def main():
     parser.add_argument('--num_epochs', type=int, default=100,
                         help='number of epochs')
 
+    parser.add_argument('--learning_rate', type=float, default=1e-2,
+                        help='learning rate')
+    parser.add_argument('--grad_clip', type=float, default=5.,
+                        help='clip gradients by this value')
+
     parser.add_argument('--save_dir', type=str, default='save',
                         help='directory to store checkpointed models')
     parser.add_argument('--save_every', type=int, default=1000,

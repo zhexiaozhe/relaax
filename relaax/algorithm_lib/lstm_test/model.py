@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from tensorflow.contrib import legacy_seq2seq
 from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
 
 
@@ -24,9 +25,38 @@ class Model:
         print(inputs.get_shape())
         print(args.seq_length)
 
-        self.lstm_outputs, self.lstm_state = \
+        lstm_outputs, self.lstm_state = \
             tf.nn.dynamic_rnn(cell,
                               inputs,
                               initial_state=self.initial_lstm_state,
                               sequence_length=[args.seq_length],
                               time_major=False)
+
+        with tf.variable_scope('lstm'):
+            softmax_w = tf.get_variable("softmax_w",
+                                        [cell.output_size, args.vocab_size])
+            softmax_b = tf.get_variable("softmax_b", [args.vocab_size])
+
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, cell.output_size])
+        self.logits = tf.matmul(lstm_outputs, softmax_w) + softmax_b
+        self.probs = tf.nn.softmax(self.logits)
+
+        loss = legacy_seq2seq.sequence_loss_by_example(
+            [self.logits],
+            [tf.reshape(self.targets, [-1])],
+            [tf.ones([args.batch_size * args.seq_length])])
+        self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
+        with tf.name_scope('cost'):
+            self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
+
+        tvars = tf.trainable_variables()
+        grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars),
+                                          args.grad_clip)
+        with tf.name_scope('optimizer'):
+            optimizer = tf.train.AdamOptimizer(args.learning_rate)
+        self.train_op = optimizer.apply_gradients(zip(grads, tvars))
+
+        # tensorboard summaries
+        tf.summary.histogram('logits', self.logits)
+        tf.summary.histogram('loss', loss)
+        tf.summary.scalar('train_loss', self.cost)
