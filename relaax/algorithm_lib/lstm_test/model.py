@@ -1,4 +1,7 @@
+from __future__ import print_function
+
 import tensorflow as tf
+import numpy as np
 
 from tensorflow.contrib import legacy_seq2seq
 from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
@@ -22,8 +25,8 @@ class Model:
 
         embedding = tf.get_variable("embedding", [args.vocab_size, args.cell_size])
         inputs = tf.nn.embedding_lookup(embedding, self.input_data)
-        print(inputs.get_shape())
-        print(args.seq_length)
+        print('Input shape:', inputs.get_shape())
+        print('Sequence length:', args.seq_length)
 
         lstm_outputs, self.lstm_state = \
             tf.nn.dynamic_rnn(cell,
@@ -60,3 +63,10 @@ class Model:
         tf.summary.histogram('logits', self.logits)
         tf.summary.histogram('loss', loss)
         tf.summary.scalar('train_loss', self.cost)
+
+        self.lstm_state_out = None
+        self.reset_state()
+
+    def reset_state(self):
+        self.lstm_state_out =\
+            np.zeros([1, self.initial_lstm_state.get_shape().as_list()[-1]])
