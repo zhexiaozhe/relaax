@@ -70,3 +70,9 @@ class Model:
     def reset_state(self):
         self.lstm_state_out =\
             np.zeros([1, self.initial_lstm_state.get_shape().as_list()[-1]])
+
+    def train_model(self, sess, feeds):
+        train_loss, self.lstm_state_out, _ =\
+            sess.run([self.cost, self.lstm_state, self.train_op],
+                     feed_dict=feeds)
+        return train_loss
