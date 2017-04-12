@@ -3,7 +3,7 @@ from __future__ import print_function
 import argparse
 
 from utils import TextLoader
-from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
+from model import Model
 
 
 def main():
@@ -16,11 +16,11 @@ def main():
 
     parser.add_argument('--cell_size', type=int, default=256,
                         help='size of LSTM cell')
-    parser.add_argument('--batch_size', type=int, default=50,
+    parser.add_argument('--batch_size', type=int, default=1,
                         help='minibatch size')
     parser.add_argument('--seq_length', type=int, default=10,
                         help='LSTM sequence length')
-    parser.add_argument('--num_epochs', type=int, default=50,
+    parser.add_argument('--num_epochs', type=int, default=100,
                         help='number of epochs')
 
     parser.add_argument('--save_dir', type=str, default='save',
@@ -35,8 +35,9 @@ def train(args):
     data_loader = TextLoader(args.data_dir, args.batch_size, args.seq_length)
     args.vocab_size = data_loader.vocab_size
 
-    cell = CustomBasicLSTMCell(args.cell_size)  # 256
-    print(cell)
+    args.model = 'basic_lstm'
+    model = Model(args)
+    print(model)
 
 if __name__ == '__main__':
     main()
