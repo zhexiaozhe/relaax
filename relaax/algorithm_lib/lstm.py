@@ -149,7 +149,7 @@ class DilatedBasicLSTMCell(RNNCell):
         with tf.variable_scope(scope or type(self).__name__):  # "DilatedBasicLSTMCell"
             self.timestep += 1
             # Parameters of gates are concatenated into one multiply for efficiency.
-            c, h = tf.split(state, [self._num_units, self.output_size()], axis=1)
+            c, h = tf.split(state, [self._num_units, self.output_size], axis=1)
             concat = self._linear([inputs, h], 4 * self._num_units, True)
 
             # i = input_gate, j = new_input, f = forget_gate, o = output_gate
