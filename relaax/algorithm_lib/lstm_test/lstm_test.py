@@ -86,20 +86,20 @@ def train(args):
                 feed = {model.input_data: x,
                         model.targets: y,
                         model.initial_lstm_state: model.lstm_state_out}
-                train_loss = model.train_model(sess, feed)
 
-                # write to tensorboard
-                if False:
-                    summ, train_loss, state, _ =\
-                        sess.run([summaries, model.cost, model.lstm_state, model.train_op], feed)
+                # do train ops & write summaries to tensorboard
+                write = True if b % 10 == 0 else False
+                train_loss, summ = model.train_model(sess, feed, summaries, write)
+                if write:
                     writer.add_summary(summ, e * data_loader.num_batches + b)
 
                 end = time.time()
 
-                print("{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}"
-                      .format(e * data_loader.num_batches + b,
-                              args.num_epochs * data_loader.num_batches,
-                              e, train_loss, end - start))
+                if b % 100 == 0:
+                    print("{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}"
+                          .format(e * data_loader.num_batches + b,
+                                  args.num_epochs * data_loader.num_batches,
+                                  e, train_loss, end - start))
                 if (e * data_loader.num_batches + b) % args.save_every == 0 \
                         or (e == args.num_epochs - 1 and
                             b == data_loader.num_batches - 1):

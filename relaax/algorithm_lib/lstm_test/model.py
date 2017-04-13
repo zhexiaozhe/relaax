@@ -74,8 +74,13 @@ class Model:
         self.lstm_state_out =\
             np.zeros([1, self.initial_lstm_state.get_shape().as_list()[-1]])
 
-    def train_model(self, sess, feeds):
-        train_loss, self.lstm_state_out, _ =\
+    def train_model(self, sess, feeds, summaries, write):
+        if write:
+            train_loss, self.lstm_state_out, _, summ =\
+                sess.run([self.cost, self.lstm_state, self.train_op, summaries],
+                         feed_dict=feeds)
+            return train_loss, summ
+        train_loss, self.lstm_state_out, _ = \
             sess.run([self.cost, self.lstm_state, self.train_op],
                      feed_dict=feeds)
-        return train_loss
+        return train_loss, None
