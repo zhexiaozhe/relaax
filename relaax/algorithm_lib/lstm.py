@@ -160,6 +160,9 @@ class DilatedBasicLSTMCell(RNNCell):
 
             # update only relevant h_i
             h = tf.reshape(h, [self._cores, -1])
+            print(h.get_shape())
+            print(new_h.get_shape())
+            print(self.get_indices())
             new_h = tf.reshape(new_h, [self._cores, -1])
 
             self._updater.assign(h)
@@ -168,6 +171,9 @@ class DilatedBasicLSTMCell(RNNCell):
 
             updated_h = tf.scatter_update(self._updater, idx, new_h)
             updated_h = tf.reshape(updated_h, [1, -1])
+
+            if self.timestep == self._cores:
+                self.timestep = 0
 
             return updated_h, tf.concat([new_c, updated_h], axis=1)
 
@@ -301,6 +307,9 @@ class DilateBasicLSTMCell(RNNCell):
             repeated_new_h = np.repeat(new_h, len(idx), axis=0)
             updated_h = tf.scatter_update(self._updater, idx, repeated_new_h)
             updated_h = tf.reshape(updated_h, [1, -1])
+
+            if self.timestep == self._cores:
+                self.timestep = 0
 
             return updated_h, tf.concat([new_c, updated_h], axis=1)
 
