@@ -1,5 +1,8 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
+
 from tensorflow.contrib.rnn import RNNCell
 
 
@@ -134,7 +137,7 @@ class DilatedBasicLSTMCell(RNNCell):
         self._forget_bias = forget_bias
         self.timestep = timestep
         # auxiliary variable for relevant updates
-        self._updater = tf.Variable(np.zeros((self._cores, self._num_units)))
+        self._updater = tf.Variable(np.zeros((self._cores, self._num_units), dtype=np.float32))
 
     @property
     def state_size(self):
@@ -148,6 +151,8 @@ class DilatedBasicLSTMCell(RNNCell):
         """Long short-term memory cell (LSTM)."""
         with tf.variable_scope(scope or type(self).__name__):  # "DilatedBasicLSTMCell"
             self.timestep += 1
+            print('timestep', self.timestep)
+
             # Parameters of gates are concatenated into one multiply for efficiency.
             c, h = tf.split(state, [self._num_units, self.output_size], axis=1)
             concat = self._linear([inputs, h], 4 * self._num_units, True)
@@ -160,14 +165,11 @@ class DilatedBasicLSTMCell(RNNCell):
 
             # update only relevant h_i
             h = tf.reshape(h, [self._cores, -1])
-            print(h.get_shape())
-            print(new_h.get_shape())
-            print(self.get_indices())
-            new_h = tf.reshape(new_h, [self._cores, -1])
-
             self._updater.assign(h)
+
             idx = self.get_indices()
-            new_h = tf.gather(new_h, idx)
+            new_h = tf.tile(new_h, [1, len(idx)])
+            new_h = tf.reshape(new_h, [len(idx), -1])
 
             updated_h = tf.scatter_update(self._updater, idx, new_h)
             updated_h = tf.reshape(updated_h, [1, -1])
