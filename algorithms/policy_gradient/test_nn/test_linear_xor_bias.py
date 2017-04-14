@@ -1,8 +1,11 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
 
 HIDDEN_SIZE = 2
 EPOCHS = 10**3
+OUTPUT = 'sigmoid'  # 'relu'
 
 # define input / output placeholders to infer forward pass & compute loss
 x_ = tf.placeholder(name="input", shape=[None, 2], dtype=tf.float32)
@@ -16,7 +19,15 @@ layer1 = tf.nn.relu(tf.add(tf.matmul(x_, w1), b1))
 # 2nd layer: weight matrix variable + bias vector & activation
 w2 = tf.Variable(tf.random_uniform(shape=[HIDDEN_SIZE, 1]))
 b2 = tf.Variable(tf.constant(value=0.0, shape=[1], dtype=tf.float32))
-nn_output = tf.nn.relu(tf.add(tf.matmul(layer1, w2), b2))
+if OUTPUT == 'relu':
+    nn_output = tf.nn.relu(tf.add(tf.matmul(layer1, w2), b2))
+    # relu more straightforward in this way -> since works better than sigmoid
+elif OUTPUT == 'sigmoid':
+    nn_output = tf.nn.sigmoid(tf.add(tf.matmul(layer1, w2), b2))
+else:
+    nn_output = tf.add(tf.matmul(layer1, w2), b2)
+    print('You can pass output activations as: "relu" or "sigmoid"')
+print('Output activation:', OUTPUT)
 
 # define optimizer & diff loss & train_op
 adam = tf.train.AdamOptimizer(1e-2)
