@@ -164,16 +164,19 @@ class DilatedBasicLSTMCell(RNNCell):
             new_h = tf.tanh(new_c) * tf.sigmoid(o)
 
             # update only relevant h_i
+            idx_old, idx_new = self.get_indices()
+
             h = tf.reshape(h, [self._cores, -1])
-            idx = self.get_indices()
-            print(idx)
-            h_to_update = tf.gather(h, idx)
+            idx_old = tf.one_hot(idx_old, depth=self._cores)
+            h = tf.matmul(idx_old, h)
 
-            new_h = tf.tile(new_h, [1, len(idx)])
-            new_h = tf.reshape(new_h, [len(idx), -1])
+            new_h = tf.tile(new_h, [1, self._cores])
+            new_h = tf.reshape(new_h, [self._cores, -1])
+            idx_new = tf.one_hot(idx_new, depth=self._cores)
+            new_h = tf.matmul(idx_new, new_h)
 
-            h_to_update.assign(new_h)   # tf.where
-            updated_h = tf.reshape(h, [1, -1])
+            updated_h = h + new_h
+            updated_h = tf.reshape(updated_h, [1, -1])
 
             if self.timestep == self._cores:
                 self.timestep = 0
@@ -233,10 +236,18 @@ class DilatedBasicLSTMCell(RNNCell):
         return res + bias_term
 
     def get_indices(self):
+        idx_old = [-1] * self._cores
+        idx_new = [-1] * self._cores
         indices = []
         for i in range(1, self._cores + 1):
             indices.append(self.timestep % i)
-        return list(set(indices))
+        idx = list(set(indices))
+        for i in range(len(idx)):
+            idx_new[idx[i]] = idx[i]
+        for i in range(self._cores):
+            if idx_new[i] == -1:
+                idx_old[i] = i
+        return idx_old, idx_new
 
 
 class DilateBasicLSTMCell(RNNCell):
