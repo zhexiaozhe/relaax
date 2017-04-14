@@ -165,14 +165,15 @@ class DilatedBasicLSTMCell(RNNCell):
 
             # update only relevant h_i
             h = tf.reshape(h, [self._cores, -1])
-            self._updater.assign(h)
-
             idx = self.get_indices()
+            print(idx)
+            h_to_update = tf.gather(h, idx)
+
             new_h = tf.tile(new_h, [1, len(idx)])
             new_h = tf.reshape(new_h, [len(idx), -1])
 
-            updated_h = tf.scatter_update(self._updater, idx, new_h)
-            updated_h = tf.reshape(updated_h, [1, -1])
+            h_to_update.assign(new_h)   # tf.where
+            updated_h = tf.reshape(h, [1, -1])
 
             if self.timestep == self._cores:
                 self.timestep = 0
