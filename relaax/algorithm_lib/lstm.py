@@ -142,6 +142,7 @@ class DilatedBasicLSTMCell(RNNCell):
         self.idx = tf.constant(np.ones(cores, dtype=np.int64) * -1)
         self.idx_old = tf.Variable(np.ones(cores, dtype=np.int64))
         self.idx_new = tf.Variable(np.ones(cores, dtype=np.int64))
+        self.ones = tf.constant(np.ones(cores, dtype=np.int64))
 
     @property
     def state_size(self):
@@ -237,10 +238,9 @@ class DilatedBasicLSTMCell(RNNCell):
         idx_old = self.idx_old.assign(self.idx)
         idx_new = self.idx_new.assign(self.idx)
 
-        step = tf.add(self.steps, 1)
-        step = tf.cond(tf.equal(step[0], self._cores + 1),
-                       lambda: tf.add(step, -self._cores),
-                       lambda: tf.identity(step))
+        step = tf.cond(tf.less(self.steps[0], self._cores),
+                       lambda: self.steps.assign_add(self.ones),
+                       lambda: self.steps.assign(self.ones))
         mod = tf.mod(step, self.i)
 
         uni, _ = tf.unique(mod)

@@ -92,7 +92,7 @@ def train(args):
                 train_loss, summ = model.train_model(sess, feed, summaries, write)
                 if write:
                     writer.add_summary(summ, e * data_loader.num_batches + b)
-                # print('step', model.cell.timestep)
+                # print('step', sess.run(model.cell.steps))
                 end = time.time()
 
                 if b % 100 == 0:
