@@ -147,6 +147,7 @@ class DilatedBasicLSTMCell(RNNCell):
 
     def __call__(self, inputs, state, scope=None):
         """Long short-term memory cell (LSTM)."""
+        idx_old, idx_new = self.get_indices()
         with tf.variable_scope(scope or type(self).__name__):  # "DilatedBasicLSTMCell"
             # Parameters of gates are concatenated into one multiply for efficiency.
             c, h = tf.split(state, [self._num_units, self.output_size], axis=1)
@@ -159,8 +160,6 @@ class DilatedBasicLSTMCell(RNNCell):
             new_h = tf.tanh(new_c) * tf.sigmoid(o)
 
             # update only relevant h_i
-            idx_old, idx_new = self.get_indices()
-
             h = tf.reshape(h, [self._cores, -1])
             idx_old = tf.one_hot(idx_old, depth=self._cores)
             h = tf.matmul(idx_old, h)
@@ -172,9 +171,6 @@ class DilatedBasicLSTMCell(RNNCell):
 
             updated_h = h + new_h
             updated_h = tf.reshape(updated_h, [1, -1])
-
-            if self.timestep == self._cores:
-                self.timestep = 0
 
             return updated_h, tf.concat([new_c, updated_h], axis=1)
 
@@ -232,6 +228,7 @@ class DilatedBasicLSTMCell(RNNCell):
 
     def get_indices(self):
         self.timestep += 1
+
         idx_old = [-1] * self._cores
         idx_new = [-1] * self._cores
         indices = []
@@ -243,6 +240,10 @@ class DilatedBasicLSTMCell(RNNCell):
         for i in range(self._cores):
             if idx_new[i] == -1:
                 idx_old[i] = i
+
+        if self.timestep == self._cores:
+            self.timestep = 0
+
         return idx_old, idx_new
 
 
