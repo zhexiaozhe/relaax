@@ -136,8 +136,6 @@ class DilatedBasicLSTMCell(RNNCell):
         self._cores = cores
         self._forget_bias = forget_bias
         self.timestep = timestep
-        # auxiliary variable for relevant updates
-        self._updater = tf.Variable(np.zeros((self._cores, self._num_units), dtype=np.float32))
 
     @property
     def state_size(self):
