@@ -13,9 +13,9 @@ class Model:
         self.args = args
 
         if args.model == 'basic_lstm':
-            cell = CustomBasicLSTMCell(args.cell_size)
+            self.cell = CustomBasicLSTMCell(args.cell_size)
         elif args.model == 'dilated_lstm':
-            cell = DilatedBasicLSTMCell(args.cell_size, cores=10)
+            self.cell = DilatedBasicLSTMCell(args.cell_size, cores=10)
         else:
             raise Exception('Unknown network type: {}'.format(args.model))
 
@@ -24,7 +24,7 @@ class Model:
         self.targets = tf.placeholder(
             tf.int32, [args.batch_size, args.seq_length])
 
-        self.initial_lstm_state = tf.placeholder(tf.float32, [1, cell.state_size])
+        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.cell.state_size])
 
         embedding = tf.get_variable("embedding", [args.vocab_size, args.cell_size])
         inputs = tf.nn.embedding_lookup(embedding, self.input_data)
@@ -32,7 +32,7 @@ class Model:
         print('Sequence length:', args.seq_length)
 
         lstm_outputs, self.lstm_state = \
-            tf.nn.dynamic_rnn(cell,
+            tf.nn.dynamic_rnn(self.cell,
                               inputs,
                               initial_state=self.initial_lstm_state,
                               sequence_length=[args.seq_length],
@@ -40,10 +40,10 @@ class Model:
 
         with tf.variable_scope('lstm'):
             softmax_w = tf.get_variable("softmax_w",
-                                        [cell.output_size, args.vocab_size])
+                                        [self.cell.output_size, args.vocab_size])
             softmax_b = tf.get_variable("softmax_b", [args.vocab_size])
 
-        lstm_outputs = tf.reshape(lstm_outputs, [-1, cell.output_size])
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, self.cell.output_size])
         self.logits = tf.matmul(lstm_outputs, softmax_w) + softmax_b
         self.probs = tf.nn.softmax(self.logits)
 

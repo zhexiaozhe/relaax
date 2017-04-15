@@ -148,7 +148,6 @@ class DilatedBasicLSTMCell(RNNCell):
     def __call__(self, inputs, state, scope=None):
         """Long short-term memory cell (LSTM)."""
         with tf.variable_scope(scope or type(self).__name__):  # "DilatedBasicLSTMCell"
-            self.timestep += 1
             # Parameters of gates are concatenated into one multiply for efficiency.
             c, h = tf.split(state, [self._num_units, self.output_size], axis=1)
             concat = self._linear([inputs, h], 4 * self._num_units, True)
@@ -232,6 +231,7 @@ class DilatedBasicLSTMCell(RNNCell):
         return res + bias_term
 
     def get_indices(self):
+        self.timestep += 1
         idx_old = [-1] * self._cores
         idx_new = [-1] * self._cores
         indices = []
