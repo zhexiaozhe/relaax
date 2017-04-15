@@ -137,8 +137,11 @@ class DilatedBasicLSTMCell(RNNCell):
         self._forget_bias = forget_bias
         # auxiliary
         self.timestep = timestep
-        self.steps = tf.Variable(np.ones(cores, dtype=np.int32) * timestep)
-        self.i = tf.constant(np.arange(1, cores + 1, dtype=np.int32))
+        self.steps = tf.Variable(np.ones(cores, dtype=np.int64) * timestep)
+        self.i = tf.constant(np.arange(1, cores + 1, dtype=np.int64))
+        self.idx = tf.constant(np.ones(cores, dtype=np.int64) * -1)
+        self.idx_old = tf.Variable(np.ones(cores, dtype=np.int64))
+        self.idx_new = tf.Variable(np.ones(cores, dtype=np.int64))
 
     @property
     def state_size(self):
@@ -150,7 +153,8 @@ class DilatedBasicLSTMCell(RNNCell):
 
     def __call__(self, inputs, state, scope=None):
         """Long short-term memory cell (LSTM)."""
-        idx_old, idx_new = self.get_indices()
+        # idx_old, idx_new = self.get_indices()
+        idx_old, idx_new = self.tf_indices()
         with tf.variable_scope(scope or type(self).__name__):  # "DilatedBasicLSTMCell"
             # Parameters of gates are concatenated into one multiply for efficiency.
             c, h = tf.split(state, [self._num_units, self.output_size], axis=1)
@@ -228,6 +232,25 @@ class DilatedBasicLSTMCell(RNNCell):
             self.bias = bias_term
 
         return res + bias_term
+
+    def tf_indices(self):
+        idx_old = self.idx_old.assign(self.idx)
+        idx_new = self.idx_new.assign(self.idx)
+
+        step = tf.add(self.steps, 1)
+        step = tf.cond(tf.equal(step[0], self._cores + 1),
+                       lambda: tf.add(step, -self._cores),
+                       lambda: tf.identity(step))
+        mod = tf.mod(step, self.i)
+
+        uni, _ = tf.unique(mod)
+        idx_new = tf.scatter_update(idx_new, uni, uni)
+
+        where = tf.where(tf.equal(idx_new, idx_old))
+        where = tf.reshape(where, [1, -1])[0]
+        idx_old = tf.scatter_update(idx_old, where, where)
+
+        return idx_old, idx_new
 
     def get_indices(self):
         self.timestep += 1
