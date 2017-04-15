@@ -135,7 +135,10 @@ class DilatedBasicLSTMCell(RNNCell):
         assert cores > 0, 'The number of cores must be greater than zero'
         self._cores = cores
         self._forget_bias = forget_bias
+        # auxiliary
         self.timestep = timestep
+        self.steps = tf.Variable(np.ones(cores, dtype=np.int32) * timestep)
+        self.i = tf.constant(np.arange(1, cores + 1, dtype=np.int32))
 
     @property
     def state_size(self):
