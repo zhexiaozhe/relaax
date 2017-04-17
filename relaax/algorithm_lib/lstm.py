@@ -302,8 +302,13 @@ class DilateBasicLSTMCell(RNNCell):
         self._cores = cores
         self._forget_bias = forget_bias
         self.timestep = timestep
-        # auxiliary variable for relevant updates
-        self._updater = tf.Variable(np.zeros((self._cores, self._num_units)))
+        # auxiliary variables for relevant updates
+        self.steps = tf.Variable(np.ones(cores, dtype=np.int64) * timestep)
+        self.i = tf.constant(np.arange(1, cores + 1, dtype=np.int64))
+        self.idx = tf.constant(np.ones(cores, dtype=np.int64) * -1)
+        self.idx_old = tf.Variable(np.ones(cores, dtype=np.int64))
+        self.idx_new = tf.Variable(np.ones(cores, dtype=np.int64))
+        self.ones = tf.constant(np.ones(cores, dtype=np.int64))
 
     @property
     def state_size(self):
@@ -315,24 +320,11 @@ class DilateBasicLSTMCell(RNNCell):
 
     def __call__(self, inputs, state, scope=None):
         """Long short-term memory cell (LSTM)."""
+        idx_old, idx_new = self.tf_indices()
         with tf.variable_scope(scope or type(self).__name__):  # "DilateBasicLSTMCell"
-            self.timestep += 1
             # Parameters of gates are concatenated into one multiply for efficiency.
-            c, h = tf.split(state, [self._num_units, self.output_size()], axis=1)
-            self._updater.assign(h)
-
-            # Get the relevant part of `h` to update
-            idx = self.get_indices()
-
-            h_i = tf.reshape(h, [self._cores, -1])
-            h_i = tf.gather(h_i, idx)
-            h_i = tf.reshape(h_i, [1, -1])
-
-            input_i = tf.reshape(input, [self._cores, -1])
-            input_i = tf.gather(input_i, idx)
-            input_i = tf.reshape(input_i, [1, -1])
-
-            concat = self._linear([input_i, h_i], 4 * self._num_units, True)
+            c, h = tf.split(state, [self._num_units, self.output_size], axis=1)
+            concat = self._linear([inputs, h], 4 * self._num_units, True)
 
             # i = input_gate, j = new_input, f = forget_gate, o = output_gate
             i, j, f, o = tf.split(concat, 4, axis=1)
@@ -341,12 +333,17 @@ class DilateBasicLSTMCell(RNNCell):
             new_h = tf.tanh(new_c) * tf.sigmoid(o)
 
             # update only relevant parts of `h`
-            repeated_new_h = np.repeat(new_h, len(idx), axis=0)
-            updated_h = tf.scatter_update(self._updater, idx, repeated_new_h)
-            updated_h = tf.reshape(updated_h, [1, -1])
+            h = tf.reshape(h, [self._cores, -1])
+            idx_old = tf.one_hot(idx_old, depth=self._cores)
+            h = tf.matmul(idx_old, h)
 
-            if self.timestep == self._cores:
-                self.timestep = 0
+            new_h = tf.tile(new_h, [1, self._cores])
+            new_h = tf.reshape(new_h, [self._cores, -1])
+            idx_new = tf.one_hot(idx_new, depth=self._cores)
+            new_h = tf.matmul(idx_new, new_h)
+
+            updated_h = h + new_h
+            updated_h = tf.reshape(updated_h, [1, -1])
 
             return updated_h, tf.concat([new_c, updated_h], axis=1)
 
@@ -372,26 +369,24 @@ class DilateBasicLSTMCell(RNNCell):
         if not isinstance(args, (list, tuple)):
             args = [args]
 
-        # Calculate the total size of arguments on dimension 1.
-        total_arg_size = 0
-        shapes = [a.get_shape().as_list() for a in args]
-        for shape in shapes:
+        # Calculate the input size as first arguments on dimension 1.
+        input_size = 0
+        if len(args) == 2:
+            shape = args[0].get_shape().as_list()
             if len(shape) != 2:
-                raise ValueError("Linear is expecting 2D arguments: %s" % str(shapes))
+                raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
             if not shape[1]:
-                raise ValueError("Linear expects shape[1] of arguments: %s" % str(shapes))
+                raise ValueError("Linear expects shape[1] of arguments: %s" % str(shape))
             else:
-                total_arg_size += shape[1]
+                input_size += shape[1]
 
         # Computation
         with tf.variable_scope(scope or "Linear"):
-            matrix = tf.get_variable("Matrix", [self._num_units*2, output_size])
+            matrix = tf.get_variable("Matrix", [input_size + self._num_units, output_size])
 
-            up, down = tf.split(matrix, 2, axis=0)
-            times = int(args[0].get_shape().as_list()[1] / self._num_units)
-            up_tiled = np.repeat(up, times, axis=0)
-            down_tiled = np.repeat(down, times, axis=0)
-            new_matrix = tf.concat([up_tiled, down_tiled], axis=0)
+            up, down = tf.split(matrix, [input_size, self._num_units], axis=0)
+            down_tiled = tf.tile(down, [self._cores, 1])
+            new_matrix = tf.concat([up, down_tiled], axis=0)
 
             res = tf.matmul(tf.concat(args, axis=1), new_matrix)
             if not bias:
@@ -406,8 +401,20 @@ class DilateBasicLSTMCell(RNNCell):
 
         return res + bias_term
 
-    def get_indices(self):
-        indices = []
-        for i in range(1, self._cores + 1):
-            indices.append(self.timestep % i)
-        return list(set(indices))
+    def tf_indices(self):
+        idx_old = self.idx_old.assign(self.idx)
+        idx_new = self.idx_new.assign(self.idx)
+
+        step = tf.cond(tf.less(self.steps[0], self._cores),
+                       lambda: self.steps.assign_add(self.ones),
+                       lambda: self.steps.assign(self.ones))
+        mod = tf.mod(step, self.i)
+
+        uni, _ = tf.unique(mod)
+        idx_new = tf.scatter_update(idx_new, uni, uni)
+
+        where = tf.where(tf.equal(idx_new, idx_old))
+        where = tf.reshape(where, [1, -1])[0]
+        idx_old = tf.scatter_update(idx_old, where, where)
+
+        return idx_old, idx_new
