@@ -16,8 +16,10 @@ class Trainer:
         self.training_threads = []
 
     def signal_handler(self):
-        print('You pressed Ctrl+C!')
-        self.perform_training = False
+        def handler(signal, frame):
+            print('You pressed Ctrl+C!')
+            self.perform_training = False
+        return handler
 
     def train_function(self, thread_index, sess, summaries, summary_writer):
         training_thread = self.training_threads[thread_index]
@@ -48,7 +50,7 @@ class Trainer:
                 target=self.train_function,
                 args=(idx, sess, summaries, summary_writer)))
 
-        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGINT, self.signal_handler())
 
         for t in train_threads:
             t.start()
