@@ -6,11 +6,8 @@ from config import cfg
 
 class _A3CNetwork(object):
     def __init__(self):
-        self.global_t = tf.Variable(0, tf.int64)
-        self.increment_global_t = tf.assign_add(self.global_t, 1)
-
-        self.W_conv1 = _conv_weight_variable([8, 8, 4, 16])  # stride=4
-        self.b_conv1 = _conv_bias_variable([16], 8, 8, 4)
+        self.W_conv1 = _conv_weight_variable([8, 8, 3, 16])   # stride=4
+        self.b_conv1 = _conv_bias_variable([16], 8, 8, 3)     # 3<>12-ch or 3D-3x4
 
         self.W_conv2 = _conv_weight_variable([4, 4, 16, 32])  # stride=2
         self.b_conv2 = _conv_bias_variable([32], 4, 4, 16)
@@ -33,6 +30,16 @@ class _A3CNetwork(object):
             self.W_fc2, self.b_fc2,
             self.W_fc3, self.b_fc3
         ]
+
+
+class A3CGlobalNetwork(_A3CNetwork):
+    def __init__(self):
+        super(A3CGlobalNetwork, self).__init__()
+
+
+class A3CLocalNetwork(_A3CNetwork):
+    def __init__(self):
+        super(A3CLocalNetwork, self).__init__()
 
 
 def _conv_weight_variable(shape):
