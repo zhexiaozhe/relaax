@@ -1,6 +1,8 @@
+from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 
+from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
 from config import cfg
 
 
@@ -15,6 +17,9 @@ class _A3CNetwork(object):
         self.W_fc1 = _fc_weight_variable([2592, 256])
         self.b_fc1 = _fc_bias_variable([256], 2592)
 
+        # lstm
+        self.lstm = CustomBasicLSTMCell(256)
+
         # weight for policy output layer
         self.W_fc2 = _fc_weight_variable([256, cfg.action_size])
         self.b_fc2 = _fc_bias_variable([cfg.action_size], 256)
@@ -23,13 +28,54 @@ class _A3CNetwork(object):
         self.W_fc3 = _fc_weight_variable([256, 1])
         self.b_fc3 = _fc_bias_variable([1], 256)
 
-        self.values = [
+        # state (input)
+        self.s = tf.placeholder("float", [None] + cfg.state_size)  # (?, 84, 84, 3)
+
+        h_conv1 = tf.nn.relu(_conv2d(self.s, self.W_conv1, 4) + self.b_conv1)
+        # h_conv1 (?, 20, 20, 16)
+        h_conv2 = tf.nn.relu(_conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
+        # h_conv2 (?, 9, 9, 32)
+
+        h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
+        # h_conv2_flat(?, 2592)
+        h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
+        # h_fc1 (?, 256)
+        h_fc1_reshaped = tf.reshape(h_fc1, [1, -1, 256])
+        # h_fc_reshaped (1, ?, 256)
+
+        # placeholders for LSTM unrolling time step size & initial_lstm_state
+        self.step_size = tf.placeholder(tf.float32, [1])
+        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
+
+        lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
+                                                          h_fc1_reshaped,
+                                                          initial_state=self.initial_lstm_state,
+                                                          sequence_length=self.step_size,
+                                                          time_major=False)
+        # lstm_outputs (1, ?, 256)
+        self.weights = [
             self.W_conv1, self.b_conv1,
             self.W_conv2, self.b_conv2,
             self.W_fc1, self.b_fc1,
+            self.lstm.matrix, self.lstm.bias,
             self.W_fc2, self.b_fc2,
             self.W_fc3, self.b_fc3
         ]
+
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, 256])
+        # lstm_outputs (?, 256)
+
+        # policy (output)
+        self.pi = tf.nn.softmax(tf.matmul(lstm_outputs, self.W_fc2) + self.b_fc2)
+        # self.pi(?, action_size)
+
+        # value (output)
+        v_ = tf.matmul(lstm_outputs, self.W_fc3) + self.b_fc3
+        # v_(?, 1)
+        self.v = tf.reshape(v_, [-1])
+        # self.v (?,)
+
+        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
 
 class A3CGlobalNetwork(_A3CNetwork):
@@ -40,6 +86,45 @@ class A3CGlobalNetwork(_A3CNetwork):
 class A3CLocalNetwork(_A3CNetwork):
     def __init__(self):
         super(A3CLocalNetwork, self).__init__()
+
+    def sync_from(self, src_network):
+        sync_ops = []
+        for (src_var, dst_var) in zip(src_network.weights, self.weights):
+            sync_op = tf.assign(dst_var, src_var)
+            sync_ops.append(sync_op)
+
+        return tf.group(*sync_ops)
+
+    def reset_state(self):
+        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
+
+    def run_policy_and_value(self, sess, s_t):
+        pi_out, v_out, self.lstm_state_out = sess.run([self.pi, self.v, self.lstm_state],
+                                                      feed_dict={self.s: [s_t],
+                                                                 self.initial_lstm_state: self.lstm_state_out,
+                                                                 self.step_size: [1]})
+        print('P&V pi_out.shape', pi_out.shape,
+              'P&V v_out.shape', v_out.shape)
+        return pi_out[0], v_out[0]
+
+    def run_policy(self, sess, s_t):
+        pi_out, self.lstm_state_out = sess.run([self.pi, self.lstm_state],
+                                               feed_dict={self.s: [s_t],
+                                                          self.initial_lstm_state: self.lstm_state_out,
+                                                          self.step_size: [1]})
+        print('P pi_out.shape', pi_out.shape)
+        return pi_out[0]
+
+    def run_value(self, sess, s_t):
+        prev_lstm_state_out = self.lstm_state_out
+        v_out, _ = sess.run([self.v, self.lstm_state],
+                            feed_dict={self.s: [s_t],
+                                       self.initial_lstm_state: self.lstm_state_out,
+                                       self.step_size: [1]})
+        # roll back lstm state
+        self.lstm_state_out = prev_lstm_state_out
+        print('V v_out.shape', v_out.shape)
+        return v_out[0]
 
 
 def _conv_weight_variable(shape):
