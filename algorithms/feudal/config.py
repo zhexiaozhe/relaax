@@ -17,7 +17,16 @@ class Config:
         self.episode_len = 10   # 10 (MR) | 20 (Pong)
 
         # learning rate
+        self.entropy_beta = 1e-2
+
+        # learning rate
         self.learning_rate = 7e-4
+
+        # maximum global time step
+        self.MAX_TIME_STEP = 10 * 10 ** 7
+
+        self.RMSP_ALPHA = 0.99   # decay parameter for RMSProp
+        self.RMSP_EPSILON = 0.1  # epsilon parameter for RMSProp
 
 
 cfg = Config()
