@@ -84,7 +84,6 @@ class A3CGlobalNetwork(_A3CNetwork):
     def __init__(self, thread_index=-1):
         super(A3CGlobalNetwork, self).__init__(thread_index)
         self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
-        self.score_input = tf.placeholder(tf.float32, [], name="episode_reward")
 
         self.optimizer = tf.train.RMSPropOptimizer(
             learning_rate=self.learning_rate_input,

@@ -37,8 +37,9 @@ class A3CTrainingThread(object):
         self.episode_reward = 0
 
         # summary for tensorboard
-        self.score = global_network.score_input
-        tf.summary.scalar('episode_reward', self.score)
+        if thread_index == 0:
+            self.score_input = tf.placeholder(tf.float32, [], name="episode_reward")
+            tf.summary.scalar('episode_reward', self.score_input)
 
     def _anneal_learning_rate(self, global_time_step):
         learning_rate = self.initial_learning_rate *\
@@ -86,9 +87,10 @@ class A3CTrainingThread(object):
                 terminal_end = True
                 print("Score:", self.episode_reward)
 
-                summary_str = sess.run(summaries,
-                                       feed_dict={self.score: self.episode_reward})
-                summary_writer.add_summary(summary_str, global_t)
+                if self.thread_index == 0:
+                    summary_str = sess.run(summaries,
+                                           feed_dict={self.score_input: self.episode_reward})
+                    summary_writer.add_summary(summary_str, global_t)
 
                 self.episode_reward = 0
                 self.state = _process_state(self.env.reset())
