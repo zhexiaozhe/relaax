@@ -15,7 +15,7 @@ class A3CTrainingThread(object):
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
 
-        self.local_network = A3CLocalNetwork()
+        self.local_network = A3CLocalNetwork(thread_index)
 
         self.compute_gradients = tf.gradients(self.local_network.total_loss,
                                               self.local_network.weights)

@@ -7,7 +7,7 @@ from config import cfg
 
 
 class _A3CNetwork(object):
-    def __init__(self):
+    def __init__(self, thread_index):
         W_conv1 = _conv_weight_variable([8, 8, 3, 16])   # stride=4
         b_conv1 = _conv_bias_variable([16], 8, 8, 3)     # 3<>12-ch or 3D-3x4
 
@@ -47,11 +47,13 @@ class _A3CNetwork(object):
         self.step_size = tf.placeholder(tf.float32, [1])
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
 
+        scope = "net_" + str(thread_index)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
                                                           h_fc1_reshaped,
                                                           initial_state=self.initial_lstm_state,
                                                           sequence_length=self.step_size,
-                                                          time_major=False)
+                                                          time_major=False,
+                                                          scope=scope)
         # lstm_outputs (1, ?, 256)
         self.weights = [
             W_conv1, b_conv1,
@@ -79,8 +81,8 @@ class _A3CNetwork(object):
 
 
 class A3CGlobalNetwork(_A3CNetwork):
-    def __init__(self):
-        super(A3CGlobalNetwork, self).__init__()
+    def __init__(self, thread_index=-1):
+        super(A3CGlobalNetwork, self).__init__(thread_index)
         self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
 
         self.optimizer = tf.train.RMSPropOptimizer(
@@ -92,8 +94,8 @@ class A3CGlobalNetwork(_A3CNetwork):
 
 
 class A3CLocalNetwork(_A3CNetwork):
-    def __init__(self):
-        super(A3CLocalNetwork, self).__init__()
+    def __init__(self, thread_index):
+        super(A3CLocalNetwork, self).__init__(thread_index)
         # taken action (input for policy)
         self.a = tf.placeholder("float", [None, cfg.action_size])
 
