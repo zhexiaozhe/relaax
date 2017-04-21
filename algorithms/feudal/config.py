@@ -11,10 +11,10 @@ class Config:
         self.state_size = [84, 84, 3]   # Box(210, 160, 3) - default
 
         # number of threads
-        self.threads_num = 8
+        self.threads_num = 2
 
         # local loop size for one episode
-        self.episode_len = 10   # 10 (MR) | 20 (Pong)
+        self.LOCAL_T_MAX = 20   # 10 (MR) | 20 (Pong)
 
         # learning rate
         self.entropy_beta = 1e-2

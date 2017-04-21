@@ -139,8 +139,7 @@ class A3CLocalNetwork(_A3CNetwork):
                                                       feed_dict={self.s: [s_t],
                                                                  self.initial_lstm_state: self.lstm_state_out,
                                                                  self.step_size: [1]})
-        print('P&V pi_out.shape', pi_out.shape,
-              'P&V v_out.shape', v_out.shape)
+        # pi_out.shape(1, action_size), v_out.shape(1, 1)-> reshaped to (1,)
         return pi_out[0], v_out[0]
 
     def run_policy(self, sess, s_t):
@@ -148,7 +147,7 @@ class A3CLocalNetwork(_A3CNetwork):
                                                feed_dict={self.s: [s_t],
                                                           self.initial_lstm_state: self.lstm_state_out,
                                                           self.step_size: [1]})
-        print('P pi_out.shape', pi_out.shape)
+        # pi_out.shape(1, action_size)
         return pi_out[0]
 
     def run_value(self, sess, s_t):
@@ -159,7 +158,7 @@ class A3CLocalNetwork(_A3CNetwork):
                                        self.step_size: [1]})
         # roll back lstm state
         self.lstm_state_out = prev_lstm_state_out
-        print('V v_out.shape', v_out.shape)
+        # v_out.shape(1, 1)-> reshaped to (1,)
         return v_out[0]
 
 
