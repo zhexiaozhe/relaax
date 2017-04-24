@@ -78,7 +78,7 @@ def train(args):
 
         for e in range(args.num_epochs):
             data_loader.reset_batch_pointer()
-            model.reset_state()  # ? -> should be tested
+            model.reset_state()  # reset internal lstm state between epochs (full batch)
             for b in range(data_loader.num_batches):
                 start = time.time()
 
