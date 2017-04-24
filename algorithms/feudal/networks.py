@@ -5,21 +5,54 @@ import tensorflow as tf
 import numpy as np
 
 from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
-from relaax.algorithm_lib.lstm import DilateBasicLSTMCell
+# from relaax.algorithm_lib.lstm import DilateBasicLSTMCell
 from config import cfg
 
 
-class _A3CNetwork(object):
+class _Perception(object):
+    def __init__(self):
+        self.W_conv1 = _conv_weight_variable([8, 8, 3, 16])   # stride=4
+        self.b_conv1 = _conv_bias_variable([16], 8, 8, 3)
+
+        self.W_conv2 = _conv_weight_variable([4, 4, 16, 32])  # stride=2
+        self.b_conv2 = _conv_bias_variable([32], 4, 4, 16)
+
+        self.W_fc1 = _fc_weight_variable([2592, 256])
+        self.b_fc1 = _fc_bias_variable([256], 2592)
+
+        # state (input)
+        self.s = tf.placeholder("float", [None] + cfg.state_size)  # (?, 84, 84, 3)
+
+        h_conv1 = tf.nn.relu(_conv2d(self.s, self.W_conv1, 4) + self.b_conv1)
+        # h_conv1 (?, 20, 20, 16)
+        h_conv2 = tf.nn.relu(_conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
+        # h_conv2 (?, 9, 9, 32)
+
+        h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
+        # h_conv2_flat(?, 2592)
+        h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
+        # h_fc1 (?, 256)
+        self.perception = tf.reshape(h_fc1, [1, -1, 256])
+        # h_fc_reshaped (1, ?, 256)
+
+
+class ManagerNetwork(_Perception):
+    def __init__(self, thread_index=-1):
+        super(ManagerNetwork, self).__init__()
+        print('ManagerNetwork:', thread_index)
+        self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
+
+        self.optimizer = tf.train.RMSPropOptimizer(
+            learning_rate=self.learning_rate_input,
+            decay=cfg.RMSP_ALPHA,
+            momentum=0.0,
+            epsilon=cfg.RMSP_EPSILON
+        )
+
+
+class WorkerNetwork(_Perception):
     def __init__(self, thread_index):
-        W_conv1 = _conv_weight_variable([8, 8, 3, 16])   # stride=4
-        b_conv1 = _conv_bias_variable([16], 8, 8, 3)     # 3<>12-ch or 3D-3x4
-
-        W_conv2 = _conv_weight_variable([4, 4, 16, 32])  # stride=2
-        b_conv2 = _conv_bias_variable([32], 4, 4, 16)
-
-        W_fc1 = _fc_weight_variable([2592, 256])
-        b_fc1 = _fc_bias_variable([256], 2592)
-
+        super(WorkerNetwork, self).__init__()
         # lstm
         self.lstm = CustomBasicLSTMCell(256)
 
@@ -31,37 +64,22 @@ class _A3CNetwork(object):
         W_fc3 = _fc_weight_variable([256, 1])
         b_fc3 = _fc_bias_variable([1], 256)
 
-        # state (input)
-        self.s = tf.placeholder("float", [None] + cfg.state_size)  # (?, 84, 84, 3)
-
-        h_conv1 = tf.nn.relu(_conv2d(self.s, W_conv1, 4) + b_conv1)
-        # h_conv1 (?, 20, 20, 16)
-        h_conv2 = tf.nn.relu(_conv2d(h_conv1, W_conv2, 2) + b_conv2)
-        # h_conv2 (?, 9, 9, 32)
-
-        h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
-        # h_conv2_flat(?, 2592)
-        h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, W_fc1) + b_fc1)
-        # h_fc1 (?, 256)
-        h_fc1_reshaped = tf.reshape(h_fc1, [1, -1, 256])
-        # h_fc_reshaped (1, ?, 256)
-
         # placeholders for LSTM unrolling time step size & initial_lstm_state
         self.step_size = tf.placeholder(tf.float32, [1])
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
 
         scope = "net_" + str(thread_index)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
-                                                          h_fc1_reshaped,
+                                                          self.perception,
                                                           initial_state=self.initial_lstm_state,
                                                           sequence_length=self.step_size,
                                                           time_major=False,
                                                           scope=scope)
         # lstm_outputs (1, ?, 256)
         self.weights = [
-            W_conv1, b_conv1,
-            W_conv2, b_conv2,
-            W_fc1, b_fc1,
+            self.W_conv1, self.b_conv1,
+            self.W_conv2, self.b_conv2,
+            self.W_fc1, self.b_fc1,
             self.lstm.matrix, self.lstm.bias,
             W_fc2, b_fc2,
             W_fc3, b_fc3
@@ -82,23 +100,10 @@ class _A3CNetwork(object):
 
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
+        self.a, self.td, self.r, self.total_loss = None, None, None, None
+        self.prepare_loss()
 
-class ManagerNetwork(_A3CNetwork):
-    def __init__(self, thread_index=-1):
-        super(ManagerNetwork, self).__init__(thread_index)
-        self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
-
-        self.optimizer = tf.train.RMSPropOptimizer(
-            learning_rate=self.learning_rate_input,
-            decay=cfg.RMSP_ALPHA,
-            momentum=0.0,
-            epsilon=cfg.RMSP_EPSILON
-        )
-
-
-class WorkerNetwork(_A3CNetwork):
-    def __init__(self, thread_index):
-        super(WorkerNetwork, self).__init__(thread_index)
+    def prepare_loss(self):
         # taken action (input for policy)
         self.a = tf.placeholder("float", [None, cfg.action_size])
 
