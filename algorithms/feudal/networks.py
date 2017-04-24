@@ -56,6 +56,20 @@ class ManagerNetwork(_Perception):
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
 
         scope = "net_" + str(thread_index)
+        lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
+                                                          h_fc_reshaped,
+                                                          initial_state=self.initial_lstm_state,
+                                                          sequence_length=self.step_size,
+                                                          time_major=False,
+                                                          scope=scope)
+        # lstm_outputs (1, ?, 256 * cores)
+        self.weights = [
+            self.W_conv1, self.b_conv1,
+            self.W_conv2, self.b_conv2,
+            self.W_fc1, self.b_fc1,
+            W_Mspace, b_Mspace,
+            self.lstm.matrix, self.lstm.bias
+        ]
 
         self.learning_rate_input, self.optimizer = None, None
         self.prepare_optimizer()
