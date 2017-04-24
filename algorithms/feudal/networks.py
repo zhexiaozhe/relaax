@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
-# from relaax.algorithm_lib.lstm import DilateBasicLSTMCell
+from relaax.algorithm_lib.lstm import DilateBasicLSTMCell
 from config import cfg
 
 
@@ -30,16 +30,37 @@ class _Perception(object):
 
         h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
         # h_conv2_flat(?, 2592)
-        h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
+        self.perception = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
         # h_fc1 (?, 256)
-        self.perception = tf.reshape(h_fc1, [1, -1, 256])
-        # h_fc_reshaped (1, ?, 256)
 
 
 class ManagerNetwork(_Perception):
     def __init__(self, thread_index=-1):
         super(ManagerNetwork, self).__init__()
-        print('ManagerNetwork:', thread_index)
+
+        # weight for policy output layer
+        W_Mspace = _fc_weight_variable([256, 256])
+        b_Mspace = _fc_bias_variable([256], 256)
+
+        Mspace = tf.nn.relu(tf.matmul(self.perception, W_Mspace) + b_Mspace)
+        # Mspace (?, 256)
+
+        h_fc_reshaped = tf.reshape(Mspace, [1, -1, 256])
+        # h_fc_reshaped (1, ?, 256)
+
+        # lstm
+        self.lstm = DilateBasicLSTMCell(256, cores=10)
+
+        # placeholders for LSTM unrolling time step size & initial_lstm_state
+        self.step_size = tf.placeholder(tf.float32, [1])
+        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
+
+        scope = "net_" + str(thread_index)
+
+        self.learning_rate_input, self.optimizer = None, None
+        self.prepare_optimizer()
+
+    def prepare_optimizer(self):
         self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
 
         self.optimizer = tf.train.RMSPropOptimizer(
@@ -64,13 +85,16 @@ class WorkerNetwork(_Perception):
         W_fc3 = _fc_weight_variable([256, 1])
         b_fc3 = _fc_bias_variable([1], 256)
 
+        h_fc_reshaped = tf.reshape(self.perception, [1, -1, 256])
+        # h_fc_reshaped (1, ?, 256)
+
         # placeholders for LSTM unrolling time step size & initial_lstm_state
         self.step_size = tf.placeholder(tf.float32, [1])
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
 
         scope = "net_" + str(thread_index)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
-                                                          self.perception,
+                                                          h_fc_reshaped,
                                                           initial_state=self.initial_lstm_state,
                                                           sequence_length=self.step_size,
                                                           time_major=False,
