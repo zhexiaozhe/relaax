@@ -34,15 +34,17 @@ class _Perception(object):
         # h_fc1 (?, 256)
 
 
-class ManagerNetwork(_Perception):
-    def __init__(self, thread_index=-1):
-        super(ManagerNetwork, self).__init__()
-
+class ManagerNetwork:
+    def __init__(self):
         # weight for policy output layer
         W_Mspace = _fc_weight_variable([256, 256])
         b_Mspace = _fc_bias_variable([256], 256)
 
-        Mspace = tf.nn.relu(tf.matmul(self.perception, W_Mspace) + b_Mspace)
+        # perception (input) -> transform by Mspace
+        self.ph_perception = tf.placeholder(tf.float32, shape=[None, 256])
+        # ph_perception (?, 256)
+
+        Mspace = tf.nn.relu(tf.matmul(self.ph_perception, W_Mspace) + b_Mspace)
         # Mspace (?, 256)
 
         h_fc_reshaped = tf.reshape(Mspace, [1, -1, 256])
@@ -55,18 +57,14 @@ class ManagerNetwork(_Perception):
         self.step_size = tf.placeholder(tf.float32, [1])
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
 
-        scope = "net_" + str(thread_index)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
                                                           h_fc_reshaped,
                                                           initial_state=self.initial_lstm_state,
                                                           sequence_length=self.step_size,
                                                           time_major=False,
-                                                          scope=scope)
+                                                          scope="manager")
         # lstm_outputs (1, ?, 256 * cores)
         self.weights = [
-            self.W_conv1, self.b_conv1,
-            self.W_conv2, self.b_conv2,
-            self.W_fc1, self.b_fc1,
             W_Mspace, b_Mspace,
             self.lstm.matrix, self.lstm.bias
         ]
@@ -85,9 +83,9 @@ class ManagerNetwork(_Perception):
         )
 
 
-class WorkerNetwork(_Perception):
+class _WorkerNetwork(_Perception):
     def __init__(self, thread_index):
-        super(WorkerNetwork, self).__init__()
+        super(_WorkerNetwork, self).__init__()
         # lstm
         self.lstm = CustomBasicLSTMCell(256)
 
@@ -138,10 +136,23 @@ class WorkerNetwork(_Perception):
 
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
-        self.a, self.td, self.r, self.total_loss = None, None, None, None
-        self.prepare_loss()
 
-    def prepare_loss(self):
+class GlobalWorkerNetwork(_WorkerNetwork):
+    def __init__(self, thread_index=-1):
+        super(GlobalWorkerNetwork, self).__init__(thread_index)
+        self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
+
+        self.optimizer = tf.train.RMSPropOptimizer(
+            learning_rate=self.learning_rate_input,
+            decay=cfg.RMSP_ALPHA,
+            momentum=0.0,
+            epsilon=cfg.RMSP_EPSILON
+        )
+
+
+class LocalWorkerNetwork(_WorkerNetwork):
+    def __init__(self, thread_index):
+        super(LocalWorkerNetwork, self).__init__(thread_index)
         # taken action (input for policy)
         self.a = tf.placeholder("float", [None, cfg.action_size])
 

@@ -6,20 +6,21 @@ import numpy as np
 import gym
 from scipy.misc import imresize
 
-from networks import WorkerNetwork
+from networks import LocalWorkerNetwork
 from config import cfg
 
 
 class TrainingThread(object):
     def __init__(self,
                  thread_index,
-                 global_network):
+                 global_network,
+                 manager_network):
         self.thread_index = thread_index
 
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
 
-        self.local_network = WorkerNetwork(thread_index)
+        self.local_network = LocalWorkerNetwork(thread_index)
 
         compute_gradients = tf.gradients(self.local_network.total_loss,
                                          self.local_network.weights)
