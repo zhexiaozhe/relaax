@@ -108,7 +108,7 @@ class CustomBasicLSTMCell(RNNCell):
 
 
 class DilatedLSTMCell(RNNCell):
-    """Custom Basic LSTM recurrent network cell.
+    """Dilated LSTM recurrent network cell.
     (Modified to store matrix and bias as member variable.)
 
     The implementation is based on: http://arxiv.org/abs/1409.2329.
@@ -122,15 +122,16 @@ class DilatedLSTMCell(RNNCell):
     For advanced models, please use the full LSTMCell that follows.
     """
 
-    def __init__(self, num_units, cores, forget_bias=1.0):
+    def __init__(self, num_units, num_cores, forget_bias=1.0):
         """Initialize the basic LSTM cell.
 
         Args:
           num_units: int, The number of units in the LSTM cell.
+          num_cores: int, The number of partitions (cores) in the LSTM state.
           forget_bias: float, The bias added to forget gates (see above).
         """
         self._num_units = num_units
-        self._cores = cores
+        self._cores = num_cores
         self._forget_bias = forget_bias
 
     @property
