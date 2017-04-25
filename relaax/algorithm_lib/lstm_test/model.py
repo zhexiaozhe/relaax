@@ -21,7 +21,7 @@ class Model:
         elif args.model == 'dilate_lstm':
             self.cell = DilateBasicLSTMCell(args.cell_size, cores=10)
         elif args.model == 'dilated':
-            self.cell = DilatedLSTMCell(args.cell_size, cores=10)
+            self.cell = DilatedLSTMCell(args.cell_size, num_cores=10)
         else:
             raise Exception('Unknown network type: {}'.format(args.model))
 

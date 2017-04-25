@@ -79,9 +79,11 @@ def train(args):
         for e in range(args.num_epochs):
             data_loader.reset_batch_pointer()
             model.reset_state()  # reset internal lstm state between epochs (full batch)
+            if args.model == "dilated":
+                sess.run(model.cell.reset_timestep)
+
             for b in range(data_loader.num_batches):
                 start = time.time()
-
                 x, y = data_loader.next_batch()
                 feed = {model.input_data: x,
                         model.targets: y,

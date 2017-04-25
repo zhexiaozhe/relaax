@@ -122,7 +122,7 @@ class DilatedLSTMCell(RNNCell):
     For advanced models, please use the full LSTMCell that follows.
     """
 
-    def __init__(self, num_units, num_cores, forget_bias=1.0):
+    def __init__(self, num_units, num_cores, forget_bias=1.0, timestep=0):
         """Initialize the basic LSTM cell.
 
         Args:
@@ -131,8 +131,15 @@ class DilatedLSTMCell(RNNCell):
           forget_bias: float, The bias added to forget gates (see above).
         """
         self._num_units = num_units
-        self._cores = num_cores
         self._forget_bias = forget_bias
+        # additional variables
+        self._cores = tf.constant(num_cores)
+        self._timestep = tf.Variable(timestep)   # assign to 0 then terminal (or epoch)
+        self.reset_timestep = tf.assign(self._timestep, 0)
+        # auxiliary operators
+        dilated_mask, hold_mask = self._get_mask(num_cores)
+        self._dilated_mask = tf.constant(dilated_mask)
+        self._hold_mask = tf.constant(hold_mask)
 
     @property
     def state_size(self):
@@ -208,6 +215,17 @@ class DilatedLSTMCell(RNNCell):
             self.bias = bias_term
 
         return res + bias_term
+
+    def _get_mask(self, num_cores):
+        basis = np.arange(self._num_units)
+        dilated_mask = np.ones(self._num_units)
+        hold_mask = np.zeros(self._num_units)
+        for i in range(2, num_cores + 1):
+            dilated_mask_to_add = (basis % i == 0) * 1
+            hold_mask_to_add = dilated_mask[0] - dilated_mask_to_add
+            dilated_mask = np.concatenate([dilated_mask, dilated_mask_to_add], axis=0)
+            hold_mask = np.concatenate([hold_mask, hold_mask_to_add], axis=0)
+        return dilated_mask, hold_mask
 
 
 class DilatedBasicLSTMCell(RNNCell):
