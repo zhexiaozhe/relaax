@@ -111,6 +111,7 @@ def train(args):
 
 
 if __name__ == '__main__':
-    main('dilate_lstm')
+    main('dilated')
+    # main('dilate_lstm')
     # main('dilated_lstm')
     # main('basic_lstm')

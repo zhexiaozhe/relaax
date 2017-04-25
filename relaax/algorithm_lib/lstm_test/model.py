@@ -7,6 +7,7 @@ from tensorflow.contrib import legacy_seq2seq
 from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
 from relaax.algorithm_lib.lstm import DilatedBasicLSTMCell
 from relaax.algorithm_lib.lstm import DilateBasicLSTMCell
+from relaax.algorithm_lib.lstm import DilatedLSTMCell
 
 
 class Model:
@@ -19,6 +20,8 @@ class Model:
             self.cell = DilatedBasicLSTMCell(args.cell_size, cores=10)
         elif args.model == 'dilate_lstm':
             self.cell = DilateBasicLSTMCell(args.cell_size, cores=10)
+        elif args.model == 'dilated':
+            self.cell = DilatedLSTMCell(args.cell_size, cores=10)
         else:
             raise Exception('Unknown network type: {}'.format(args.model))
 
