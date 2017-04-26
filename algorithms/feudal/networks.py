@@ -139,7 +139,7 @@ class _WorkerNetwork(_Perception):
         # w_reshaped(?, 1, k)
 
         # action probs (output)
-        pi_ = tf.matmul(w_reshaped, tf.transpose(U_reshaped))
+        pi_ = tf.nn.softmax(tf.matmul(w_reshaped, tf.transpose(U_reshaped)))
         # pi_(?, 1, 18))
         self.pi = tf.reshape(pi_, [-1, cfg.action_size])
         # self.pi(?, 18)
