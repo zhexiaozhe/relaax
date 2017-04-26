@@ -128,16 +128,21 @@ class _WorkerNetwork(_Perception):
         U_ = tf.matmul(lstm_outputs, W_fcU) + b_fcU
         # U_(?, action_size * k)
 
-        U_reshaped = tf.reshape(U_, [cfg.action_size, cfg.k])   # [-1, cfg.action_size, cfg.k]
+        U_reshaped = tf.reshape(U_, [cfg.action_size, cfg.k, -1])
         # U_reshaped(action_size, k) <-- (?, action_size, k)
 
         # linear transform from goal to w through phi (without bias)
         w = tf.matmul(self.ph_goal, W_phi)
         # w(?, k)
 
+        w_reshaped = tf.reshape(w, [-1, 1, cfg.k])
+        # w_reshaped(?, 1, k)
+
         # action probs (output)
-        self.pi = tf.matmul(w, tf.transpose(U_reshaped))
-        # pi(?, 18)
+        pi_ = tf.matmul(w_reshaped, tf.transpose(U_reshaped))
+        # pi_(?, 1, 18))
+        self.pi = tf.reshape(pi_, [-1, cfg.action_size])
+        # self.pi(?, 18)
 
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
