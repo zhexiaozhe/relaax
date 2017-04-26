@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 
 from relaax.algorithm_lib.lstm import CustomBasicLSTMCell
-from relaax.algorithm_lib.lstm import DilateBasicLSTMCell
+from relaax.algorithm_lib.lstm import DilatedLSTMCell
 from config import cfg
 
 
@@ -17,8 +17,8 @@ class _Perception(object):
         self.W_conv2 = _conv_weight_variable([4, 4, 16, 32])  # stride=2
         self.b_conv2 = _conv_bias_variable([32], 4, 4, 16)
 
-        self.W_fc1 = _fc_weight_variable([2592, 256])
-        self.b_fc1 = _fc_bias_variable([256], 2592)
+        self.W_fc1 = _fc_weight_variable([2592, cfg.d])
+        self.b_fc1 = _fc_bias_variable([cfg.d], 2592)  # d == 256
 
         # state (input)
         self.s = tf.placeholder("float", [None] + cfg.state_size)  # (?, 84, 84, 3)
@@ -31,27 +31,27 @@ class _Perception(object):
         h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
         # h_conv2_flat(?, 2592)
         self.perception = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
-        # h_fc1 (?, 256)
+        # h_fc1 (?, d)
 
 
 class ManagerNetwork:
     def __init__(self):
         # weight for policy output layer
-        W_Mspace = _fc_weight_variable([256, 256])
-        b_Mspace = _fc_bias_variable([256], 256)
+        W_Mspace = _fc_weight_variable([cfg.d, cfg.d])
+        b_Mspace = _fc_bias_variable([cfg.d], cfg.d)
 
         # perception (input) -> transform by Mspace
-        self.ph_perception = tf.placeholder(tf.float32, shape=[None, 256])
-        # ph_perception (?, 256)
+        self.ph_perception = tf.placeholder(tf.float32, shape=[None, cfg.d])
+        # ph_perception (?, d)
 
         Mspace = tf.nn.relu(tf.matmul(self.ph_perception, W_Mspace) + b_Mspace)
-        # Mspace (?, 256)
+        # Mspace (?, d)
 
-        h_fc_reshaped = tf.reshape(Mspace, [1, -1, 256])
-        # h_fc_reshaped (1, ?, 256)
+        h_fc_reshaped = tf.reshape(Mspace, [1, -1, cfg.d])
+        # h_fc_reshaped (1, ?, d)
 
         # lstm
-        self.lstm = DilateBasicLSTMCell(256, cores=10)
+        self.lstm = DilatedLSTMCell(cfg.d, num_cores=cfg.h)
 
         # placeholders for LSTM unrolling time step size & initial_lstm_state
         self.step_size = tf.placeholder(tf.float32, [1])
@@ -63,7 +63,7 @@ class ManagerNetwork:
                                                           sequence_length=self.step_size,
                                                           time_major=False,
                                                           scope="manager")
-        # lstm_outputs (1, ?, 256 * cores)
+        # lstm_outputs (1, ?, d)
         self.weights = [
             W_Mspace, b_Mspace,
             self.lstm.matrix, self.lstm.bias
@@ -73,7 +73,7 @@ class ManagerNetwork:
         self.prepare_optimizer()
 
     def prepare_optimizer(self):
-        self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
+        self.learning_rate_input = tf.placeholder(tf.float32, [], name="mlr")
 
         self.optimizer = tf.train.RMSPropOptimizer(
             learning_rate=self.learning_rate_input,
@@ -87,18 +87,18 @@ class _WorkerNetwork(_Perception):
     def __init__(self, thread_index):
         super(_WorkerNetwork, self).__init__()
         # lstm
-        self.lstm = CustomBasicLSTMCell(256)
+        self.lstm = CustomBasicLSTMCell(cfg.d)  # d == 256
 
-        # weight for policy output layer
-        W_fc2 = _fc_weight_variable([256, cfg.action_size])
-        b_fc2 = _fc_bias_variable([cfg.action_size], 256)
+        # weight & bias for embedding matrix U: action_size * k
+        W_fcU = _fc_weight_variable([cfg.d, cfg.action_size * cfg.k])
+        b_fcU = _fc_bias_variable([cfg.action_size * cfg.k], cfg.d)
 
-        # weight for value output layer
-        W_fc3 = _fc_weight_variable([256, 1])
-        b_fc3 = _fc_bias_variable([1], 256)
+        # Goal placeholder == d summed up from c horizon (manager's goal input)
+        self.ph_goal = tf.placeholder(tf.float32, [None, cfg.d])
+        W_phi = _fc_weight_variable([cfg.d, cfg.k])  # phi is goal linear transform
 
-        h_fc_reshaped = tf.reshape(self.perception, [1, -1, 256])
-        # h_fc_reshaped (1, ?, 256)
+        h_fc_reshaped = tf.reshape(self.perception, [1, -1, cfg.d])
+        # h_fc_reshaped (1, ?, d)
 
         # placeholders for LSTM unrolling time step size & initial_lstm_state
         self.step_size = tf.placeholder(tf.float32, [1])
@@ -111,28 +111,33 @@ class _WorkerNetwork(_Perception):
                                                           sequence_length=self.step_size,
                                                           time_major=False,
                                                           scope=scope)
-        # lstm_outputs (1, ?, 256)
+        # lstm_outputs (1, ?, d)
         self.weights = [
             self.W_conv1, self.b_conv1,
             self.W_conv2, self.b_conv2,
             self.W_fc1, self.b_fc1,
             self.lstm.matrix, self.lstm.bias,
-            W_fc2, b_fc2,
-            W_fc3, b_fc3
+            W_fcU, b_fcU,
+            W_phi
         ]
 
-        lstm_outputs = tf.reshape(lstm_outputs, [-1, 256])
-        # lstm_outputs (?, 256)
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, cfg.d])
+        # lstm_outputs (?, d)
 
-        # policy (output)
-        self.pi = tf.nn.softmax(tf.matmul(lstm_outputs, W_fc2) + b_fc2)
-        # self.pi(?, action_size)
+        # U embedding matrix as row vector (worker lstm output)
+        U_ = tf.matmul(lstm_outputs, W_fcU) + b_fcU
+        # U_(?, action_size * k)
 
-        # value (output)
-        v_ = tf.matmul(lstm_outputs, W_fc3) + b_fc3
-        # v_(?, 1)
-        self.v = tf.reshape(v_, [-1])
-        # self.v (?,)
+        U_reshaped = tf.reshape(U_, [cfg.action_size, cfg.k])   # [-1, cfg.action_size, cfg.k]
+        # U_reshaped(action_size, k) <-- (?, action_size, k)
+
+        # linear transform from goal to w through phi (without bias)
+        w = tf.matmul(self.ph_goal, W_phi)
+        # w(?, k)
+
+        # action probs (output)
+        self.pi = tf.matmul(w, tf.transpose(U_reshaped))
+        # pi(?, 18)
 
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 

@@ -34,5 +34,9 @@ class Config:
 
         self.GAMMA = 0.99  # discount factor for rewards
 
+        # feudal representation
+        self.d = 256    # internal representation size
+        self.h = 10     # number of manager's cores (horizon)
+        self.k = 16     # output representation size
 
 cfg = Config()
