@@ -96,7 +96,8 @@ class ManagerNetwork:
         self.learning_rate_input, self.optimizer = None, None
         self._prepare_optimizer()
 
-        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
+        self.lstm_state_out = None
+        self.reset_state()
 
     def reset_state(self):
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
@@ -117,6 +118,17 @@ class ManagerNetwork:
             momentum=0.0,
             epsilon=cfg.RMSP_EPSILON
         )
+
+    def run_goal_and_value(self, sess, z_t):
+        g_out, v_out, self.lstm_state_out =\
+            sess.run([self.goal, self.v, self.lstm_state],
+                     feed_dict={self.ph_perception: z_t,
+                                self.initial_lstm_state: self.lstm_state_out,
+                                self.step_size: [1]})
+        # pi_out.shape(1, action_size), v_out.shape(1, 1)-> reshaped to (1,)
+        print('g_out', g_out.shape)
+        print('v_out', v_out.shape)
+        return g_out[0], v_out[0]
 
 
 class _WorkerNetwork(_Perception):

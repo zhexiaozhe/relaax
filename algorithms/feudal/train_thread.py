@@ -71,10 +71,9 @@ class TrainingThread(object):
         manager_lstm_state = self.manager_network.lstm_state_out
 
         for i in range(cfg.LOCAL_T_MAX):
-            z = sess.run(self.local_network.perception,
+            z_t = sess.run(self.local_network.perception,
                          {self.local_network.s: [self.state]})
-            goal = sess.run(self.manager_network.goal,
-                            {self.manager_network.ph_perception: z})
+            goal, v_t = self.manager_network.run_goal_and_value(sess, z_t)
 
             pi_, value_ = self.local_network.run_policy_and_value(sess, self.state)
             action = self.choose_action(pi_)
