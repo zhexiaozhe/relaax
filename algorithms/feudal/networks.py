@@ -125,9 +125,7 @@ class ManagerNetwork:
                      feed_dict={self.ph_perception: z_t,
                                 self.initial_lstm_state: self.lstm_state_out,
                                 self.step_size: [1]})
-        # pi_out.shape(1, action_size), v_out.shape(1, 1)-> reshaped to (1,)
-        print('g_out', g_out.shape)
-        print('v_out', v_out.shape)
+        # pi_out.shape(1, d), v_out.shape(1, 1)-> reshaped to (1,)
         return g_out[0], v_out[0]
 
 
