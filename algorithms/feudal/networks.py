@@ -78,7 +78,7 @@ class ManagerNetwork:
         # lstm_outputs (?, d)
 
         # goal (output)
-        self.goal = lstm_outputs / tf.norm(lstm_outputs)
+        self.goal = tf.nn.l2_normalize(lstm_outputs, dim=0)
 
         # value (output)
         v_ = tf.matmul(lstm_outputs, W_Mcritic) + b_Mcritic
@@ -86,10 +86,22 @@ class ManagerNetwork:
         self.v = tf.reshape(v_, [-1])
         # self.v (?,)
 
-        self.learning_rate_input, self.optimizer = None, None
-        self.prepare_optimizer()
+        # loss'es stuff
+        self.stc_minus_st, self.cosine_similarity = None, None
+        self._prepare_loss()
 
-    def prepare_optimizer(self):
+        # optimizer's stuff
+        self.learning_rate_input, self.optimizer = None, None
+        self._prepare_optimizer()
+
+    def _prepare_loss(self):
+        # tf.losses.cosine_distance(labels, predictions)
+        self.stc_minus_st = tf.placeholder(tf.float32, [None, cfg.d])
+        s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=0)
+
+        self.cosine_similarity = tf.matmul(s_diff_normalized, tf.transpose(self.goal))
+
+    def _prepare_optimizer(self):
         self.learning_rate_input = tf.placeholder(tf.float32, [], name="mlr")
 
         self.optimizer = tf.train.RMSPropOptimizer(

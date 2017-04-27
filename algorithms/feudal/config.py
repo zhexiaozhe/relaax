@@ -24,7 +24,7 @@ class Config:
         self.entropy_beta = 1e-2
 
         # learning rate
-        self.learning_rate = 7e-4
+        self.learning_rate = 2e-4
 
         # maximum global time step
         self.MAX_TIME_STEP = 10 * 10 ** 7
@@ -32,7 +32,8 @@ class Config:
         self.RMSP_ALPHA = 0.99   # decay parameter for RMSProp
         self.RMSP_EPSILON = 0.1  # epsilon parameter for RMSProp
 
-        self.GAMMA = 0.99  # discount factor for rewards
+        self.wGAMMA = 0.99  # worker's discount factor for rewards
+        self.mGAMMA = 0.99  # manager's discount factor for rewards
 
         # feudal representation
         self.d = 256    # internal representation size

@@ -121,7 +121,7 @@ class TrainingThread(object):
 
         # compute and accumulate gradients
         for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
-            R = ri + cfg.GAMMA * R
+            R = ri + cfg.wGAMMA * R
             td = R - Vi
             a = np.zeros([cfg.action_size])
             a[ai] = 1
