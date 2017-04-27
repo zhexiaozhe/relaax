@@ -17,6 +17,7 @@ class TrainingThread(object):
                  global_network,
                  manager_network):
         self.thread_index = thread_index
+        self.manager_network = manager_network
         self.goal_buffer = RingBuffer(element_size=cfg.d,
                                       buffer_size=cfg.c)
 

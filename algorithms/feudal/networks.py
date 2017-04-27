@@ -36,9 +36,13 @@ class _Perception(object):
 
 class ManagerNetwork:
     def __init__(self):
-        # weight for policy output layer
+        # weight & bias for policy output layer
         W_Mspace = _fc_weight_variable([cfg.d, cfg.d])
         b_Mspace = _fc_bias_variable([cfg.d], cfg.d)
+
+        # weight & bias for manager's internal critic
+        W_Mcritic = _fc_weight_variable([cfg.d, 1])
+        b_Mcritic = _fc_bias_variable([1], cfg.d)
 
         # perception (input) -> transform by Mspace
         self.ph_perception = tf.placeholder(tf.float32, shape=[None, cfg.d])
@@ -66,10 +70,18 @@ class ManagerNetwork:
         # lstm_outputs (1, ?, d)
         self.weights = [
             W_Mspace, b_Mspace,
-            self.lstm.matrix, self.lstm.bias
+            self.lstm.matrix, self.lstm.bias,
+            W_Mcritic, b_Mcritic
         ]
 
+        # goal (output)
         self.goal = lstm_outputs / tf.norm(lstm_outputs)
+
+        # value (output)
+        v_ = tf.matmul(lstm_outputs, W_Mcritic) + b_Mcritic
+        # v_(?, 1)
+        self.v = tf.reshape(v_, [-1])
+        # self.v (?,)
 
         self.learning_rate_input, self.optimizer = None, None
         self.prepare_optimizer()
