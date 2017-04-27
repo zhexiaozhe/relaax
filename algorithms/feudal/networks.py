@@ -86,7 +86,7 @@ class ManagerNetwork:
         self.v = tf.reshape(v_, [-1])
         # self.v (?,)
 
-        # loss'es stuff
+        # loss' stuff
         self.stc_minus_st, self.cosine_similarity = None, None
         self._prepare_loss()
 
@@ -122,15 +122,19 @@ class _WorkerNetwork(_Perception):
         W_fcU = _fc_weight_variable([cfg.d, cfg.action_size * cfg.k])
         b_fcU = _fc_bias_variable([cfg.action_size * cfg.k], cfg.d)
 
+        # weight & bias for worker's internal critic
+        W_Wcritic = _fc_weight_variable([cfg.d, 1])
+        b_Wcritic = _fc_bias_variable([1], cfg.d)
+
         # Goal placeholder == d summed up from c horizon (manager's goal input)
-        self.ph_goal = tf.placeholder(tf.float32, [None, cfg.d])
+        self.ph_goal = tf.placeholder(tf.float32, [None, cfg.d], name="ph_goal")
         W_phi = _fc_weight_variable([cfg.d, cfg.k])  # phi is goal linear transform
 
         h_fc_reshaped = tf.reshape(self.perception, [1, -1, cfg.d])
         # h_fc_reshaped (1, ?, d)
 
         # placeholders for LSTM unrolling time step size & initial_lstm_state
-        self.step_size = tf.placeholder(tf.float32, [1])
+        self.step_size = tf.placeholder(tf.float32, [1], name="step_size")
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
 
         scope = "net_" + str(thread_index)
@@ -147,6 +151,7 @@ class _WorkerNetwork(_Perception):
             self.W_fc1, self.b_fc1,
             self.lstm.matrix, self.lstm.bias,
             W_fcU, b_fcU,
+            W_Wcritic, b_Wcritic,
             W_phi
         ]
 
@@ -173,6 +178,12 @@ class _WorkerNetwork(_Perception):
         self.pi = tf.reshape(pi_, [-1, cfg.action_size])
         # self.pi(?, 18)
 
+        # value (output)
+        v_ = tf.matmul(lstm_outputs, W_Wcritic) + b_Wcritic
+        # v_(?, 1)
+        self.v = tf.reshape(v_, [-1])
+        # self.v (?,)
+
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
 
@@ -193,10 +204,10 @@ class LocalWorkerNetwork(_WorkerNetwork):
     def __init__(self, thread_index):
         super(LocalWorkerNetwork, self).__init__(thread_index)
         # taken action (input for policy)
-        self.a = tf.placeholder("float", [None, cfg.action_size])
+        self.a = tf.placeholder(tf.float32, [None, cfg.action_size], name="a")
 
         # temporary difference (R-V) (input for policy)
-        self.td = tf.placeholder("float", [None])
+        self.td = tf.placeholder(tf.float32, [None], name="td")
 
         # avoid NaN with getting the maximum with small value
         log_pi = tf.log(tf.maximum(self.pi, 1e-20))
@@ -210,7 +221,7 @@ class LocalWorkerNetwork(_WorkerNetwork):
             tf.reduce_sum(tf.multiply(log_pi, self.a), axis=1) * self.td + entropy * cfg.entropy_beta)
 
         # R (input for value)
-        self.r = tf.placeholder("float", [None])
+        self.r = tf.placeholder(tf.float32, [None], name="r")
 
         # value loss (output)
         # (Learning rate for Critic is half of Actor's, it's l2 without dividing by 0.5)
