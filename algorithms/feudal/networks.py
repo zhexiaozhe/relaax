@@ -74,6 +74,9 @@ class ManagerNetwork:
             W_Mcritic, b_Mcritic
         ]
 
+        lstm_outputs = tf.reshape(lstm_outputs, [-1, cfg.d])
+        # lstm_outputs (?, d)
+
         # goal (output)
         self.goal = lstm_outputs / tf.norm(lstm_outputs)
 
