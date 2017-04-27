@@ -36,7 +36,8 @@ class Config:
 
         # feudal representation
         self.d = 256    # internal representation size
-        self.h = 10     # number of manager's cores (horizon)
         self.k = 16     # output representation size
+        self.h = 10     # number of manager's cores (horizon)
+        self.c = 10     # goal horizon to sum up
 
 cfg = Config()

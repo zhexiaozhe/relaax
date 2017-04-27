@@ -8,6 +8,7 @@ from scipy.misc import imresize
 
 from networks import LocalWorkerNetwork
 from config import cfg
+from utils import RingBuffer
 
 
 class TrainingThread(object):
@@ -16,6 +17,8 @@ class TrainingThread(object):
                  global_network,
                  manager_network):
         self.thread_index = thread_index
+        self.goal_buffer = RingBuffer(element_size=cfg.d,
+                                      buffer_size=cfg.c)
 
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
