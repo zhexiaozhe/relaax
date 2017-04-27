@@ -69,6 +69,8 @@ class ManagerNetwork:
             self.lstm.matrix, self.lstm.bias
         ]
 
+        self.goal = lstm_outputs / tf.norm(lstm_outputs)
+
         self.learning_rate_input, self.optimizer = None, None
         self.prepare_optimizer()
 
