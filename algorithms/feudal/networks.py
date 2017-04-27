@@ -45,7 +45,8 @@ class ManagerNetwork:
         b_Mcritic = _fc_bias_variable([1], cfg.d)
 
         # perception (input) -> transform by Mspace
-        self.ph_perception = tf.placeholder(tf.float32, shape=[None, cfg.d])
+        self.ph_perception = tf.placeholder(tf.float32, shape=[None, cfg.d],
+                                            name="ph_perception")
         # ph_perception (?, d)
 
         Mspace = tf.nn.relu(tf.matmul(self.ph_perception, W_Mspace) + b_Mspace)
@@ -58,8 +59,9 @@ class ManagerNetwork:
         self.lstm = DilatedLSTMCell(cfg.d, num_cores=cfg.h)
 
         # placeholders for LSTM unrolling time step size & initial_lstm_state
-        self.step_size = tf.placeholder(tf.float32, [1])
-        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
+        self.step_size = tf.placeholder(tf.float32, [1], name="manager_step_size")
+        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size],
+                                                 name="manager_lstm_state")
 
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
                                                           h_fc_reshaped,
@@ -94,15 +96,20 @@ class ManagerNetwork:
         self.learning_rate_input, self.optimizer = None, None
         self._prepare_optimizer()
 
+        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
+
+    def reset_state(self):
+        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
+
     def _prepare_loss(self):
         # tf.losses.cosine_distance(labels, predictions)
-        self.stc_minus_st = tf.placeholder(tf.float32, [None, cfg.d])
+        self.stc_minus_st = tf.placeholder(tf.float32, [None, cfg.d], name="stc_minus_st")
         s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=0)
 
         self.cosine_similarity = tf.matmul(s_diff_normalized, tf.transpose(self.goal))
 
     def _prepare_optimizer(self):
-        self.learning_rate_input = tf.placeholder(tf.float32, [], name="mlr")
+        self.learning_rate_input = tf.placeholder(tf.float32, [], name="manager_lr")
 
         self.optimizer = tf.train.RMSPropOptimizer(
             learning_rate=self.learning_rate_input,
@@ -135,7 +142,8 @@ class _WorkerNetwork(_Perception):
 
         # placeholders for LSTM unrolling time step size & initial_lstm_state
         self.step_size = tf.placeholder(tf.float32, [1], name="step_size")
-        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size])
+        self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size],
+                                                 name="worker_lstm_state")
 
         scope = "net_" + str(thread_index)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
@@ -190,7 +198,7 @@ class _WorkerNetwork(_Perception):
 class GlobalWorkerNetwork(_WorkerNetwork):
     def __init__(self, thread_index=-1):
         super(GlobalWorkerNetwork, self).__init__(thread_index)
-        self.learning_rate_input = tf.placeholder(tf.float32, [], name="lr")
+        self.learning_rate_input = tf.placeholder(tf.float32, [], name="worker_lr")
 
         self.optimizer = tf.train.RMSPropOptimizer(
             learning_rate=self.learning_rate_input,
