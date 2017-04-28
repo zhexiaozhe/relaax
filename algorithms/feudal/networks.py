@@ -261,11 +261,13 @@ class LocalWorkerNetwork(_WorkerNetwork):
     def reset_state(self):
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
-    def run_policy_and_value(self, sess, s_t):
-        pi_out, v_out, self.lstm_state_out = sess.run([self.pi, self.v, self.lstm_state],
-                                                      feed_dict={self.s: [s_t],
-                                                                 self.initial_lstm_state: self.lstm_state_out,
-                                                                 self.step_size: [1]})
+    def run_policy_and_value(self, sess, s_t, goal):
+        pi_out, v_out, self.lstm_state_out =\
+            sess.run([self.pi, self.v, self.lstm_state],
+                     feed_dict={self.s: [s_t],
+                                self.ph_goal: [goal],
+                                self.initial_lstm_state: self.lstm_state_out,
+                                self.step_size: [1]})
         # pi_out.shape(1, action_size), v_out.shape(1, 1)-> reshaped to (1,)
         return pi_out[0], v_out[0]
 

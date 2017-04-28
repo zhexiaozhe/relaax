@@ -78,10 +78,13 @@ class TrainingThread(object):
 
             states_t.append(s_t)
             m_values.append(v_t)
-            self.goal_buffer.extend(goal)
-            goals.append(self.goal_buffer.get_sum())
 
-            pi_, value_ = self.local_network.run_policy_and_value(sess, self.state)
+            self.goal_buffer.extend(goal)
+            goal = self.goal_buffer.get_sum()
+            goals.append(goal)
+
+            pi_, value_ =\
+                self.local_network.run_policy_and_value(sess, self.state, goal)
             action = self.choose_action(pi_)
 
             states.append(self.state)
