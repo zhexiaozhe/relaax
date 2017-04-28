@@ -23,6 +23,7 @@ class TrainingThread(object):
         self.st_buffer = RingBuffer2D(element_size=cfg.d,
                                       buffer_size=cfg.c*2)
         self.first = cfg.c
+        self.states = []
 
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
@@ -63,7 +64,19 @@ class TrainingThread(object):
         return np.random.choice(len(pi_probs), p=pi_probs)
 
     def process(self, sess, global_t, summaries, summary_writer):
-        states, actions, rewards, values = [], [], [], []
+        # update the first half of accumulated data
+        if self.first == 0:
+            if len(self.states) > cfg.c:
+                self.states = self.states[cfg.c:]
+            zt_batch = sess.run(self.local_network.perception,
+                                {self.local_network.s: self.states})
+            print('zt_batch', zt_batch.shape())
+            goals_batch, st_batch =\
+                self.manager_network.run_goal_and_st(sess, zt_batch)
+            self.goal_buffer.replace_first_half(goals_batch)
+            self.st_buffer.replace_first_half(st_batch)
+
+        self.states, actions, rewards, values = [], [], [], []
         goals, m_values, states_t = [], [], []
         terminal_end = False
 
@@ -76,7 +89,7 @@ class TrainingThread(object):
 
         for i in range(cfg.LOCAL_T_MAX + self.first):
             z_t = sess.run(self.local_network.perception,
-                         {self.local_network.s: [self.state]})
+                           {self.local_network.s: [self.state]})
             goal, v_t, s_t = self.manager_network.run_goal_value_st(sess, z_t)
 
             self.goal_buffer.extend(goal)
@@ -90,7 +103,7 @@ class TrainingThread(object):
                 self.local_network.run_policy_and_value(sess, self.state, goal)
             action = self.choose_action(pi_)
 
-            states.append(self.state)
+            self.states.append(self.state)
             actions.append(action)
             values.append(value_)
 
@@ -127,6 +140,7 @@ class TrainingThread(object):
         if not terminal_end:
             R = self.local_network.run_value(sess, self.state)
             self.first = 0
+        states = self.states[:]
 
         actions.reverse()
         states.reverse()

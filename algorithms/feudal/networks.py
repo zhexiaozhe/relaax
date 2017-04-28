@@ -130,6 +130,21 @@ class ManagerNetwork:
         # s_t(1, d)-> s_t(d, )
         return g_out[0], v_out[0], s_t
 
+    def run_goal_and_st(self, sess, z_t):
+        # freeze the initial lstm state
+        prev_lstm_state_out = self.lstm_state_out
+
+        s_t, self.lstm_state_out, g_out =\
+            sess.run([self.Mspace, self.lstm_state, self.goal],
+                     feed_dict={self.ph_perception: z_t,
+                                self.initial_lstm_state: self.lstm_state_out,
+                                self.step_size: [cfg.c]})
+        # roll back lstm state
+        self.lstm_state_out = prev_lstm_state_out
+
+        # pi_out.shape(1, d), v_out.shape(1, 1)-> reshaped to (1,)
+        return g_out, s_t
+
 
 class _WorkerNetwork(_Perception):
     def __init__(self, thread_index):
