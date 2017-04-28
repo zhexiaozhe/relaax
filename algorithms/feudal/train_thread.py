@@ -8,7 +8,7 @@ from scipy.misc import imresize
 
 from networks import LocalWorkerNetwork
 from config import cfg
-from utils import RingBuffer
+from utils import RingBuffer2D
 
 
 class TrainingThread(object):
@@ -18,8 +18,11 @@ class TrainingThread(object):
                  manager_network):
         self.thread_index = thread_index
         self.manager_network = manager_network
-        self.goal_buffer = RingBuffer(element_size=cfg.d,
-                                      buffer_size=cfg.c)
+        self.goal_buffer = RingBuffer2D(element_size=cfg.d,
+                                        buffer_size=cfg.c)
+        self.st_buffer = RingBuffer2D(element_size=cfg.d,
+                                      buffer_size=cfg.c*2)
+        self.first = cfg.c
 
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
@@ -71,17 +74,17 @@ class TrainingThread(object):
         start_lstm_state = self.local_network.lstm_state_out
         manager_lstm_state = self.manager_network.lstm_state_out
 
-        for i in range(cfg.LOCAL_T_MAX):
+        for i in range(cfg.LOCAL_T_MAX + self.first):
             z_t = sess.run(self.local_network.perception,
                          {self.local_network.s: [self.state]})
             goal, v_t, s_t = self.manager_network.run_goal_value_st(sess, z_t)
 
-            states_t.append(s_t)
-            m_values.append(v_t)
-
             self.goal_buffer.extend(goal)
             goal = self.goal_buffer.get_sum()
             goals.append(goal)
+
+            m_values.append(v_t)
+            self.st_buffer.extend(s_t)
 
             pi_, value_ =\
                 self.local_network.run_policy_and_value(sess, self.state, goal)
@@ -106,6 +109,7 @@ class TrainingThread(object):
 
             if terminal:
                 terminal_end = True
+                self.first = cfg.c
                 print("Score:", self.episode_reward)
 
                 if self.thread_index == 0:
@@ -122,6 +126,7 @@ class TrainingThread(object):
         R = 0.0
         if not terminal_end:
             R = self.local_network.run_value(sess, self.state)
+            self.first = 0
 
         actions.reverse()
         states.reverse()

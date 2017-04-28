@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class RingBuffer:
+class RingBuffer2D:
     """ A 2D ring buffer using numpy arrays """
     def __init__(self, element_size, buffer_size):
         self.data = np.zeros((buffer_size, element_size), dtype=np.float32)
