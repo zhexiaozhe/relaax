@@ -40,5 +40,6 @@ class Config:
         self.k = 16     # output representation size
         self.h = 10     # number of manager's cores (horizon)
         self.c = 10     # goal horizon to sum up
+        self.alpha = 1  # alpha for intrinsic reward
 
 cfg = Config()

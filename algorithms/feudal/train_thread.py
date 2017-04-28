@@ -118,10 +118,6 @@ class TrainingThread(object):
             env_state, reward, terminal, _ = self.env.step(action)
             self.local_t += 1
 
-            self.episode_reward += reward
-            # clip reward
-            rewards.append(np.clip(reward, -1, 1))
-
             # calc internal rewards produces by manager
             # depends on st and goals buffers within the horizon
             if self.cur_c < 10:
@@ -145,6 +141,10 @@ class TrainingThread(object):
             else:
                 reward_i = 0
             # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8
+
+            self.episode_reward += reward
+            # clip & sum up external and intrinsic reward
+            rewards.append(np.clip(reward, -1, 1) + cfg.alpha * reward_i)
 
             if terminal:
                 terminal_end = True
