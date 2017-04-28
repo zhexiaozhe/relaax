@@ -19,7 +19,7 @@ class TrainingThread(object):
         self.thread_index = thread_index
         self.manager_network = manager_network
         self.goal_buffer = RingBuffer2D(element_size=cfg.d,
-                                        buffer_size=cfg.c)
+                                        buffer_size=cfg.c*2)
         self.st_buffer = RingBuffer2D(element_size=cfg.d,
                                       buffer_size=cfg.c*2)
         self.first = cfg.c

@@ -11,8 +11,14 @@ class RingBuffer2D:
         self.data = np.vstack((self.data[1:, :], array_to_add))
 
     def get_sum(self):
-        """ Returns the sum of elements within the rows of buffer """
-        return np.sum(self.data, axis=0)
+        """ Returns the sum of elements within the rows of last half of the buffer """
+        _, second = np.split(self.data, 2)
+        return np.sum(second, axis=0)
+
+    def get_diff(self):
+        """ Returns the difference between the two halfs of data """
+        first, second = np.split(self.data, 2)
+        return second - first
 
     def reset(self):
         """ Resets buffer's data -> sets all elements to zeros """
