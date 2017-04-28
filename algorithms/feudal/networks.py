@@ -49,10 +49,10 @@ class ManagerNetwork:
                                             name="ph_perception")
         # ph_perception (?, d)
 
-        Mspace = tf.nn.relu(tf.matmul(self.ph_perception, W_Mspace) + b_Mspace)
+        self.Mspace = tf.nn.relu(tf.matmul(self.ph_perception, W_Mspace) + b_Mspace)
         # Mspace (?, d)
 
-        h_fc_reshaped = tf.reshape(Mspace, [1, -1, cfg.d])
+        h_fc_reshaped = tf.reshape(self.Mspace, [1, -1, cfg.d])
         # h_fc_reshaped (1, ?, d)
 
         # lstm
@@ -119,14 +119,16 @@ class ManagerNetwork:
             epsilon=cfg.RMSP_EPSILON
         )
 
-    def run_goal_and_value(self, sess, z_t):
-        g_out, v_out, self.lstm_state_out =\
-            sess.run([self.goal, self.v, self.lstm_state],
+    def run_goal_value_st(self, sess, z_t):
+        s_t, self.lstm_state_out, g_out, v_out =\
+            sess.run([self.Mspace, self.lstm_state, self.goal, self.v],
                      feed_dict={self.ph_perception: z_t,
                                 self.initial_lstm_state: self.lstm_state_out,
                                 self.step_size: [1]})
         # pi_out.shape(1, d), v_out.shape(1, 1)-> reshaped to (1,)
-        return g_out[0], v_out[0]
+        s_t = np.reshape(s_t, (-1))
+        # s_t(1, d)-> s_t(d, )
+        return g_out[0], v_out[0], s_t
 
 
 class _WorkerNetwork(_Perception):

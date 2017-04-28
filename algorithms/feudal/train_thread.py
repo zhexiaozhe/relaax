@@ -61,7 +61,7 @@ class TrainingThread(object):
 
     def process(self, sess, global_t, summaries, summary_writer):
         states, actions, rewards, values = [], [], [], []
-        goals, m_values = [], []
+        goals, m_values, states_t = [], [], []
         terminal_end = False
 
         # copy weights from shared to local
@@ -74,8 +74,9 @@ class TrainingThread(object):
         for i in range(cfg.LOCAL_T_MAX):
             z_t = sess.run(self.local_network.perception,
                          {self.local_network.s: [self.state]})
-            goal, v_t = self.manager_network.run_goal_and_value(sess, z_t)
+            goal, v_t, s_t = self.manager_network.run_goal_value_st(sess, z_t)
 
+            states_t.append(s_t)
             m_values.append(v_t)
             self.goal_buffer.extend(goal)
             goals.append(self.goal_buffer.get_sum())
