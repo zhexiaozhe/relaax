@@ -120,7 +120,7 @@ class TrainingThread(object):
 
             # calc internal rewards produces by manager
             # depends on st and goals buffers within the horizon
-            if self.cur_c < 10:
+            if self.cur_c < cfg.c:
                 self.cur_c += 1
             if not terminal:
                 self.state = _process_state(env_state)
