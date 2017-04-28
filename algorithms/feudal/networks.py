@@ -145,6 +145,9 @@ class ManagerNetwork:
         # pi_out.shape(1, d), v_out.shape(1, 1)-> reshaped to (1,)
         return g_out, s_t
 
+    def run_st(self, sess, z_t):
+        return sess.run(self.Mspace, feed_dict={self.ph_perception: z_t})
+
 
 class _WorkerNetwork(_Perception):
     def __init__(self, thread_index):

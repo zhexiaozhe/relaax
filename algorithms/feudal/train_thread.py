@@ -94,24 +94,6 @@ class TrainingThread(object):
                            {self.local_network.s: [self.state]})
             goal, v_t, s_t = self.manager_network.run_goal_value_st(sess, z_t)
 
-            # calc internal rewards produces by manager
-            # depends on st and goals buffers within the horizon
-            reward_i = []
-            for k in range(1, self.cur_c + 1):
-                cur_st = s_t - self.st_buffer.data[-k, :]
-                st_normed = cur_st / np.linalg.norm(cur_st)
-                cur_goal = self.goal_buffer.data[-k, :]
-                goals_normed = cur_goal / np.linalg.norm(cur_goal)
-                cosine = np.dot(st_normed, goals_normed.transpose())
-                reward_i.append(cosine)
-            if self.cur_c > 0:
-                reward_i = sum(reward_i) / self.cur_c
-            else:
-                reward_i = 0
-            if self.cur_c < 10:
-                self.cur_c += 1
-            # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8
-
             self.goal_buffer.extend(goal)
             goal = self.goal_buffer.get_sum()
             goals.append(goal)
@@ -140,6 +122,30 @@ class TrainingThread(object):
             # clip reward
             rewards.append(np.clip(reward, -1, 1))
 
+            # calc internal rewards produces by manager
+            # depends on st and goals buffers within the horizon
+            if self.cur_c < 10:
+                self.cur_c += 1
+            if not terminal:
+                self.state = _process_state(env_state)
+                z_t = sess.run(self.local_network.perception,
+                               {self.local_network.s: [self.state]})
+                s_t = self.manager_network.run_st(sess, z_t)
+
+                reward_i = []
+                for k in range(1, self.cur_c + 1):
+                    cur_st = s_t - self.st_buffer.data[-k, :]
+                    st_normed = cur_st / np.linalg.norm(cur_st)
+                    cur_goal = self.goal_buffer.data[-k, :]
+                    goals_normed = cur_goal / np.linalg.norm(cur_goal)
+                    cosine = np.dot(st_normed, goals_normed.transpose())
+                    reward_i.append(cosine)
+
+                reward_i = sum(reward_i) / self.cur_c
+            else:
+                reward_i = 0
+            # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8
+
             if terminal:
                 terminal_end = True
                 self.first = cfg.c
@@ -154,7 +160,6 @@ class TrainingThread(object):
                 self.state = _process_state(self.env.reset())
                 self.local_network.reset_state()    # may be move further after update
                 break
-            self.state = _process_state(env_state)
 
         R = 0.0
         if not terminal_end:
