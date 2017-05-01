@@ -74,7 +74,7 @@ class TrainingThread(object):
             # print('zt_batch', zt_batch.shape)
             goals_batch, st_batch =\
                 self.manager_network.run_goal_and_st(sess, zt_batch)
-            self.goal_buffer.replace_first_half(goals_batch)
+            self.goal_buffer.replace_first_half(goals_batch)    # goal_buffer ?
             self.st_buffer.replace_first_half(st_batch)
 
         self.states, actions, rewards, values = [], [], [], []
@@ -113,7 +113,7 @@ class TrainingThread(object):
             if (self.thread_index == 0) and (self.local_t % 100) == 0:
                 print("TIMESTEP", self.local_t)
                 print("pi=", pi_)
-                print(" V=", value_)
+                print(" V=", v_t)   # value_
 
             # act
             env_state, reward, terminal, _ = self.env.step(action)
@@ -165,6 +165,8 @@ class TrainingThread(object):
                 self.episode_reward = 0
                 self.state = _process_state(self.env.reset())
 
+                self.st_buffer.reset()
+                self.goal_buffer.reset()
                 self.local_network.reset_state()    # may be move further after update
                 self.manager_network.reset_state()  # may be move further after update
                 break
