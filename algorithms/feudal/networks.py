@@ -21,7 +21,8 @@ class _Perception(object):
         self.b_fc1 = _fc_bias_variable([cfg.d], 2592)  # d == 256
 
         # state (input)
-        self.s = tf.placeholder("float", [None] + cfg.state_size)  # (?, 84, 84, 3)
+        self.s = tf.placeholder(tf.float32, [None] + cfg.state_size,
+                                name="input_state")  # (?, 84, 84, 3)
 
         h_conv1 = tf.nn.relu(_conv2d(self.s, self.W_conv1, 4) + self.b_conv1)
         # h_conv1 (?, 20, 20, 16)
@@ -107,17 +108,24 @@ class ManagerNetwork:
         self.stc_minus_st = tf.placeholder(tf.float32, [None, cfg.d], name="stc_minus_st")
         s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=0)
 
-        self.cosine_similarity = tf.matmul(s_diff_normalized, tf.transpose(self.goal))
+        cosine_similarity = tf.matmul(s_diff_normalized, tf.transpose(self.goal))
+
+        # temporary difference (R-V) (input for manager's advantage)
+        self.tdM = tf.placeholder(tf.float32, [None], name="tdM")
+
+        self.lossM = tf.reduce_sum(self.tdM * cosine_similarity)
 
     def _prepare_optimizer(self):
         self.learning_rate_input = tf.placeholder(tf.float32, [], name="manager_lr")
 
-        self.optimizer = tf.train.RMSPropOptimizer(
+        optimizer = tf.train.RMSPropOptimizer(
             learning_rate=self.learning_rate_input,
             decay=cfg.RMSP_ALPHA,
             momentum=0.0,
             epsilon=cfg.RMSP_EPSILON
         )
+
+        self.optimize = optimizer.minimize(self.lossM, var_list=self.weights)
 
     def run_goal_value_st(self, sess, z_t):
         s_t, self.lstm_state_out, g_out, v_out =\

@@ -39,7 +39,8 @@ class TrainingThread(object):
         )
 
         self.sync = self.local_network.sync_from(global_network)
-        self.lr = global_network.learning_rate_input
+        self.lrW = global_network.learning_rate_input
+        self.lrM = manager_network.learning_rate_input
 
         self.env = gym.make(cfg.env_name)
         self.env.seed(113 * thread_index)
@@ -67,18 +68,16 @@ class TrainingThread(object):
     def process(self, sess, global_t, summaries, summary_writer):
         # update the first half of accumulated data
         if self.first == 0:
-            if len(self.states) > cfg.c:
-                self.states = self.states[cfg.c:]
             zt_batch = sess.run(self.local_network.perception,
                                 {self.local_network.s: self.states})
-            print('zt_batch', zt_batch.shape())
+            # print('zt_batch', zt_batch.shape)
             goals_batch, st_batch =\
                 self.manager_network.run_goal_and_st(sess, zt_batch)
             self.goal_buffer.replace_first_half(goals_batch)
             self.st_buffer.replace_first_half(st_batch)
 
         self.states, actions, rewards, values = [], [], [], []
-        goals, m_values, states_t, rewards_i = [], [], [], []
+        goals, m_values, states_t, rewards_i, zt_inp = [], [], [], [], []
         terminal_end = False
         self.cur_c = 0
 
@@ -92,6 +91,7 @@ class TrainingThread(object):
         for i in range(cfg.LOCAL_T_MAX + self.first):
             z_t = sess.run(self.local_network.perception,
                            {self.local_network.s: [self.state]})
+            zt_inp.append(z_t[0])
             goal, v_t, s_t = self.manager_network.run_goal_value_st(sess, z_t)
 
             self.goal_buffer.extend(goal)
@@ -169,45 +169,68 @@ class TrainingThread(object):
             R, z_t = self.local_network.run_value_and_zt(sess, self.state)
             Ri = self.manager_network.run_value(sess, z_t)
             self.first = 0
+
+        if len(self.states) > cfg.c:
+            self.states = self.states[cfg.c:]
+            actions = actions[cfg.c:]
+            rewards = rewards[cfg.c:]
+            rewards_i = rewards_i[cfg.c:]
+            values = values[cfg.c:]
+            m_values = m_values[cfg.c:]
+            zt_inp = zt_inp[cfg.c:]
+            goals = goals[cfg.c:]
+
         states = self.states[:]
 
         actions.reverse()
-        states.reverse()
         rewards.reverse()
         rewards_i.reverse()
         values.reverse()
+        m_values.reverse()
 
-        batch_si = []
         batch_a = []
-        batch_td = []
+        batch_tdM = []
+        batch_tdW = []
         batch_R = []
 
         # compute and accumulate gradients
-        for (ai, ri, rii, si, Vi) in zip(actions, rewards, rewards_i, states, values):
+        for (ai, ri, riM, Vi, ViM) in zip(actions, rewards, rewards_i,
+                                          values, m_values):
             R = ri + cfg.wGAMMA * R
-            Ri = rii + cfg.mGAMMA * Ri
-            td = R + Ri - Vi
+            Ri = riM + cfg.mGAMMA * Ri
+            tdM = R - ViM
+            tdW = R + Ri - Vi
             a = np.zeros([cfg.action_size])
             a[ai] = 1
 
-            batch_si.append(si)
             batch_a.append(a)
-            batch_td.append(td)
+            batch_tdM.append(tdM)
+            batch_tdW.append(tdW)
             batch_R.append(R+Ri)
 
-        batch_si.reverse()
         batch_a.reverse()
-        batch_td.reverse()
+        batch_tdM.reverse()
+        batch_tdW.reverse()
         batch_R.reverse()
 
-        sess.run(self.apply_gradients,
+        learning_rate = self._anneal_learning_rate(global_t)
+
+        sess.run([self.manager_network.optimize, self.apply_gradients],
                  feed_dict={
-                         self.local_network.s: batch_si,
+                         self.manager_network.ph_perception: zt_inp,
+                         self.manager_network.stc_minus_st: self.st_buffer.get_diff(),
+                         self.manager_network.tdM: batch_tdM,
+                         self.manager_network.initial_lstm_state: manager_lstm_state,
+                         self.lrM: learning_rate,
+                         self.manager_network.step_size: [len(batch_a)],
+
+                         self.local_network.s: states,
+                         self.local_network.ph_goal: goals,
                          self.local_network.a: batch_a,
-                         self.local_network.td: batch_td,
+                         self.local_network.td: batch_tdW,
                          self.local_network.r: batch_R,
                          self.local_network.initial_lstm_state: start_lstm_state,
-                         self.lr: self._anneal_learning_rate(global_t),
+                         self.lrW: learning_rate,
                          self.local_network.step_size: [len(batch_a)]})
 
         # return advanced local step size
