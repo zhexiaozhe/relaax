@@ -166,7 +166,8 @@ class TrainingThread(object):
 
         R = Ri = 0.0
         if not terminal_end:
-            R = Ri = self.local_network.run_value(sess, self.state)
+            R, z_t = self.local_network.run_value_and_zt(sess, self.state)
+            Ri = self.manager_network.run_value(sess, z_t)
             self.first = 0
         states = self.states[:]
 

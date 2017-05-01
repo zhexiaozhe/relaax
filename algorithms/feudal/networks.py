@@ -142,11 +142,26 @@ class ManagerNetwork:
         # roll back lstm state
         self.lstm_state_out = prev_lstm_state_out
 
-        # pi_out.shape(1, d), v_out.shape(1, 1)-> reshaped to (1,)
+        # g_out.shape(cfg.c, d), s_t.shape(cfg.c, d)
         return g_out, s_t
 
     def run_st(self, sess, z_t):
         return sess.run(self.Mspace, feed_dict={self.ph_perception: z_t})
+
+    def run_value(self, sess, z_t):
+        # freeze the initial lstm state
+        prev_lstm_state_out = self.lstm_state_out
+
+        self.lstm_state_out, v_out =\
+            sess.run([self.lstm_state, self.v],
+                     feed_dict={self.ph_perception: z_t,
+                                self.initial_lstm_state: self.lstm_state_out,
+                                self.step_size: [1]})
+        # roll back lstm state
+        self.lstm_state_out = prev_lstm_state_out
+
+        # v_out.shape(1, 1)-> reshaped to (1,)
+        return v_out[0]
 
 
 class _WorkerNetwork(_Perception):
@@ -297,16 +312,17 @@ class LocalWorkerNetwork(_WorkerNetwork):
         # pi_out.shape(1, action_size)
         return pi_out[0]
 
-    def run_value(self, sess, s_t):
+    def run_value_and_zt(self, sess, s_t):
         prev_lstm_state_out = self.lstm_state_out
-        v_out, _ = sess.run([self.v, self.lstm_state],
-                            feed_dict={self.s: [s_t],
-                                       self.initial_lstm_state: self.lstm_state_out,
-                                       self.step_size: [1]})
+        zt_out, _, v_out =\
+            sess.run([self.perception, self.lstm_state, self.v],
+                     feed_dict={self.s: [s_t],
+                                self.initial_lstm_state: self.lstm_state_out,
+                                self.step_size: [1]})
         # roll back lstm state
         self.lstm_state_out = prev_lstm_state_out
-        # v_out.shape(1, 1)-> reshaped to (1,)
-        return v_out[0]
+        # zt_out.shape(1, d)  v_out.shape(1, 1)-> reshaped to (1,)
+        return v_out[0], zt_out
 
 
 def _conv_weight_variable(shape):
