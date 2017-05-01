@@ -78,7 +78,7 @@ class TrainingThread(object):
             self.st_buffer.replace_first_half(st_batch)
 
         self.states, actions, rewards, values = [], [], [], []
-        goals, m_values, states_t = [], [], []
+        goals, m_values, states_t, rewards_i = [], [], [], []
         terminal_end = False
         self.cur_c = 0
 
@@ -137,14 +137,15 @@ class TrainingThread(object):
                     cosine = np.dot(st_normed, goals_normed.transpose())
                     reward_i.append(cosine)
 
-                reward_i = sum(reward_i) / self.cur_c
+                reward_i = sum(reward_i)[0] / self.cur_c
             else:
                 reward_i = 0
             # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8
 
             self.episode_reward += reward
-            # clip & sum up external and intrinsic reward
-            rewards.append(np.clip(reward, -1, 1) + cfg.alpha * reward_i)
+            # clip & append external and intrinsic reward
+            rewards.append(np.clip(reward, -1, 1))
+            rewards_i.append(cfg.alpha * reward_i)
 
             if terminal:
                 terminal_end = True
@@ -158,18 +159,21 @@ class TrainingThread(object):
 
                 self.episode_reward = 0
                 self.state = _process_state(self.env.reset())
+
                 self.local_network.reset_state()    # may be move further after update
+                self.manager_network.reset_state()  # may be move further after update
                 break
 
-        R = 0.0
+        R = Ri = 0.0
         if not terminal_end:
-            R = self.local_network.run_value(sess, self.state)
+            R = Ri = self.local_network.run_value(sess, self.state)
             self.first = 0
         states = self.states[:]
 
         actions.reverse()
         states.reverse()
         rewards.reverse()
+        rewards_i.reverse()
         values.reverse()
 
         batch_si = []
@@ -178,16 +182,17 @@ class TrainingThread(object):
         batch_R = []
 
         # compute and accumulate gradients
-        for (ai, ri, si, Vi) in zip(actions, rewards, states, values):
+        for (ai, ri, rii, si, Vi) in zip(actions, rewards, rewards_i, states, values):
             R = ri + cfg.wGAMMA * R
-            td = R - Vi
+            Ri = rii + cfg.mGAMMA * Ri
+            td = R + Ri - Vi
             a = np.zeros([cfg.action_size])
             a[ai] = 1
 
             batch_si.append(si)
             batch_a.append(a)
             batch_td.append(td)
-            batch_R.append(R)
+            batch_R.append(R+Ri)
 
         batch_si.reverse()
         batch_a.reverse()
