@@ -25,6 +25,7 @@ class TrainingThread(object):
         self.first = cfg.c
         self.states = []
         self.cur_c = None
+        self.eps = 1e-12
 
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
@@ -131,13 +132,17 @@ class TrainingThread(object):
                 reward_i = []
                 for k in range(1, self.cur_c + 1):
                     cur_st = s_t - self.st_buffer.data[-k, :]
-                    st_normed = cur_st / np.linalg.norm(cur_st)
+                    cur_st_norm = np.maximum(np.linalg.norm(cur_st), self.eps)
+                    st_normed = cur_st / cur_st_norm
+
                     cur_goal = self.goal_buffer.data[-k, :]
-                    goals_normed = cur_goal / np.linalg.norm(cur_goal)
+                    cur_goal_norm = np.maximum(np.linalg.norm(cur_goal), self.eps)
+                    goals_normed = cur_goal / cur_goal_norm
+
                     cosine = np.dot(st_normed, goals_normed.transpose())
                     reward_i.append(cosine)
 
-                reward_i = sum(reward_i)[0] / self.cur_c
+                reward_i = sum(reward_i) / self.cur_c
             else:
                 reward_i = 0
             # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8

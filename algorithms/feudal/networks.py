@@ -154,7 +154,9 @@ class ManagerNetwork:
         return g_out, s_t
 
     def run_st(self, sess, z_t):
-        return sess.run(self.Mspace, feed_dict={self.ph_perception: z_t})
+        st_out = sess.run(self.Mspace, feed_dict={self.ph_perception: z_t})
+        # st_out.shape(1, d)
+        return st_out[0]
 
     def run_value(self, sess, z_t):
         # freeze the initial lstm state
