@@ -7,6 +7,7 @@ import gym
 from scipy.misc import imresize
 
 from networks import LocalWorkerNetwork
+from networks import LocalManagerNetwork
 from config import cfg
 from utils import RingBuffer2D
 
@@ -15,9 +16,8 @@ class TrainingThread(object):
     def __init__(self,
                  thread_index,
                  global_network,
-                 manager_network):
+                 global_manager):
         self.thread_index = thread_index
-        self.manager_network = manager_network
         self.goal_buffer = RingBuffer2D(element_size=cfg.d,
                                         buffer_size=cfg.c*2)
         self.st_buffer = RingBuffer2D(element_size=cfg.d,
@@ -30,18 +30,26 @@ class TrainingThread(object):
         self.initial_learning_rate = cfg.learning_rate
         self.max_global_time_step = cfg.MAX_TIME_STEP
 
+        self.manager_network = LocalManagerNetwork(thread_index)
         self.local_network = LocalWorkerNetwork(thread_index)
 
         compute_gradients = tf.gradients(self.local_network.total_loss,
                                          self.local_network.weights)
+        compute_manager = tf.gradients(self.manager_network.lossM,
+                                       self.manager_network.weights)
 
         self.apply_gradients = global_network.optimizer.apply_gradients(
             zip(compute_gradients, global_network.weights)
         )
+        self.apply_manager = global_manager.optimizer.apply_gradients(
+            zip(compute_manager, global_manager.weights)
+        )
 
         self.sync = self.local_network.sync_from(global_network)
+        self.sync_manager = self.manager_network.sync_from(global_manager)
+
         self.lrW = global_network.learning_rate_input
-        self.lrM = manager_network.learning_rate_input
+        self.lrM = global_manager.learning_rate_input
 
         self.env = gym.make(cfg.env_name)
         self.env.seed(113 * thread_index)
@@ -67,6 +75,9 @@ class TrainingThread(object):
         return np.random.choice(len(pi_probs), p=pi_probs)
 
     def process(self, sess, global_t, summaries, summary_writer):
+        # sync local manger's weights with global
+        sess.run(self.sync_manager)
+
         # update the first half of accumulated data
         if self.first == 0:
             zt_batch = sess.run(self.local_network.perception,
@@ -84,6 +95,7 @@ class TrainingThread(object):
 
         # copy weights from shared to local
         sess.run(self.sync)
+        sess.run(self.manager_network.lstm.reset_timestep)
 
         start_local_t = self.local_t
         start_lstm_state = self.local_network.lstm_state_out
@@ -222,7 +234,7 @@ class TrainingThread(object):
 
         learning_rate = self._anneal_learning_rate(global_t)
 
-        sess.run([self.manager_network.optimize, self.apply_gradients],
+        sess.run([self.apply_manager, self.apply_gradients],
                  feed_dict={
                          self.manager_network.ph_perception: zt_inp,
                          self.manager_network.stc_minus_st: self.st_buffer.get_diff(),

@@ -8,7 +8,7 @@ import time
 import os
 
 from config import cfg
-from networks import ManagerNetwork
+from networks import GlobalManagerNetwork
 from networks import GlobalWorkerNetwork
 from train_thread import TrainingThread
 
@@ -34,11 +34,11 @@ class Trainer:
             self.global_t += diff_global_t
 
     def run(self):
-        manager_network = ManagerNetwork()
+        global_manager = GlobalManagerNetwork()
         global_network = GlobalWorkerNetwork()
 
         for idx in range(cfg.threads_num):
-            training_thread = TrainingThread(idx, global_network, manager_network)
+            training_thread = TrainingThread(idx, global_network, global_manager)
             self.training_threads.append(training_thread)
 
         sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))

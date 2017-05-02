@@ -35,8 +35,8 @@ class _Perception(object):
         # h_fc1 (?, d)
 
 
-class ManagerNetwork:
-    def __init__(self):
+class _ManagerNetwork(object):
+    def __init__(self, thread_index):
         # weight & bias for policy output layer
         W_Mspace = _fc_weight_variable([cfg.d, cfg.d])
         b_Mspace = _fc_bias_variable([cfg.d], cfg.d)
@@ -63,13 +63,13 @@ class ManagerNetwork:
         self.step_size = tf.placeholder(tf.float32, [1], name="manager_step_size")
         self.initial_lstm_state = tf.placeholder(tf.float32, [1, self.lstm.state_size],
                                                  name="manager_lstm_state")
-
+        scope = "manager_" + str(thread_index)
         lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm,
                                                           h_fc_reshaped,
                                                           initial_state=self.initial_lstm_state,
                                                           sequence_length=self.step_size,
                                                           time_major=False,
-                                                          scope="manager")
+                                                          scope=scope)
         # lstm_outputs (1, ?, d)
         self.weights = [
             W_Mspace, b_Mspace,
@@ -89,21 +89,25 @@ class ManagerNetwork:
         self.v = tf.reshape(v_, [-1])
         # self.v (?,)
 
-        # loss' stuff
-        self.stc_minus_st, self.cosine_similarity = None, None
-        self._prepare_loss()
-
-        # optimizer's stuff
-        self.learning_rate_input, self.optimizer = None, None
-        self._prepare_optimizer()
-
-        self.lstm_state_out = None
-        self.reset_state()
-
-    def reset_state(self):
         self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
-    def _prepare_loss(self):
+
+class GlobalManagerNetwork(_ManagerNetwork):
+    def __init__(self, thread_index=-1):
+        super(GlobalManagerNetwork, self).__init__(thread_index)
+        self.learning_rate_input = tf.placeholder(tf.float32, [], name="manager_lr")
+
+        self.optimizer = tf.train.RMSPropOptimizer(
+            learning_rate=self.learning_rate_input,
+            decay=cfg.RMSP_ALPHA,
+            momentum=0.0,
+            epsilon=cfg.RMSP_EPSILON
+        )
+
+
+class LocalManagerNetwork(_ManagerNetwork):
+    def __init__(self, thread_index):
+        super(LocalManagerNetwork, self).__init__(thread_index)
         # tf.losses.cosine_distance(labels, predictions)
         self.stc_minus_st = tf.placeholder(tf.float32, [None, cfg.d], name="stc_minus_st")
         s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=0)
@@ -115,17 +119,16 @@ class ManagerNetwork:
 
         self.lossM = tf.reduce_sum(self.tdM * cosine_similarity)
 
-    def _prepare_optimizer(self):
-        self.learning_rate_input = tf.placeholder(tf.float32, [], name="manager_lr")
+    def sync_from(self, src_network):
+        sync_ops = []
+        for (src_var, dst_var) in zip(src_network.weights, self.weights):
+            sync_op = tf.assign(dst_var, src_var)
+            sync_ops.append(sync_op)
 
-        optimizer = tf.train.RMSPropOptimizer(
-            learning_rate=self.learning_rate_input,
-            decay=cfg.RMSP_ALPHA,
-            momentum=0.0,
-            epsilon=cfg.RMSP_EPSILON
-        )
+        return tf.group(*sync_ops)
 
-        self.optimize = optimizer.minimize(self.lossM, var_list=self.weights)
+    def reset_state(self):
+        self.lstm_state_out = np.zeros([1, self.lstm.state_size])
 
     def run_goal_value_st(self, sess, z_t):
         s_t, self.lstm_state_out, g_out, v_out =\
