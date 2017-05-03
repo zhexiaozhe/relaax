@@ -85,7 +85,10 @@ class TrainingThread(object):
             # print('zt_batch', zt_batch.shape)
             goals_batch, st_batch =\
                 self.manager_network.run_goal_and_st(sess, zt_batch)
-            self.goal_buffer.replace_first_half(goals_batch)    # goal_buffer ?
+            # goal_buffer -> if terminal we can catch some old goals,
+            # which needs to recompute within the current context of NN
+            # TODO: replace first cgf.c to align within current context of horizon
+            self.goal_buffer.replace_first_half(goals_batch)
             self.st_buffer.replace_first_half(st_batch)
 
         self.states, actions, rewards, values = [], [], [], []

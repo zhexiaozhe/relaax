@@ -12,6 +12,7 @@ class RingBuffer2D:
 
     def get_sum(self):
         """ Returns the sum of elements within the rows of last half of the buffer """
+        # TODO: get last cfg.c instead of split
         _, second = np.split(self.data, 2)
         return np.sum(second, axis=0)
 
