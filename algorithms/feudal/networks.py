@@ -113,6 +113,7 @@ class LocalManagerNetwork(_ManagerNetwork):
         s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=0)
 
         cosine_similarity = tf.matmul(s_diff_normalized, tf.transpose(self.goal))
+        cosine_similarity = tf.reduce_sum(cosine_similarity, axis=1)
 
         # temporary difference (R-V) (input for manager's advantage)
         self.tdM = tf.placeholder(tf.float32, [None], name="tdM")

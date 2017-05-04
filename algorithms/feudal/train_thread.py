@@ -186,6 +186,8 @@ class TrainingThread(object):
                 self.manager_network.reset_state()  # may be move further after update
                 break
 
+        diff_local_t = self.local_t - start_local_t
+
         R = Ri = 0.0
         if not terminal_end:
             R, z_t = self.local_network.run_value_and_zt(sess, self.state)
@@ -236,15 +238,16 @@ class TrainingThread(object):
         batch_R.reverse()
 
         learning_rate = self._anneal_learning_rate(global_t)
+        st_diff = self.st_buffer.get_diff(part=diff_local_t)
 
         sess.run([self.apply_manager, self.apply_gradients],
                  feed_dict={
                          self.manager_network.ph_perception: zt_inp,
-                         self.manager_network.stc_minus_st: self.st_buffer.get_diff(),
+                         self.manager_network.stc_minus_st: st_diff,
                          self.manager_network.tdM: batch_tdM,
                          self.manager_network.initial_lstm_state: manager_lstm_state,
                          self.lrM: learning_rate,
-                         self.manager_network.step_size: [len(batch_a)],
+                         self.manager_network.step_size: [diff_local_t],
 
                          self.local_network.s: states,
                          self.local_network.ph_goal: goals,
@@ -253,10 +256,9 @@ class TrainingThread(object):
                          self.local_network.r: batch_R,
                          self.local_network.initial_lstm_state: start_lstm_state,
                          self.lrW: learning_rate,
-                         self.local_network.step_size: [len(batch_a)]})
+                         self.local_network.step_size: [diff_local_t]})
 
         # return advanced local step size
-        diff_local_t = self.local_t - start_local_t
         return diff_local_t
 
 
