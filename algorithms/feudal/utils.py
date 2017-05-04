@@ -23,10 +23,10 @@ class RingBuffer2D:
         grabbed_res = res[to_grub:, :]
         return grabbed_res
 
-    def replace_first_half(self, array_to_replace):
+    def replace_second_half(self, array_to_replace):
         """ Replaces the buffer's hals from beginning by new array """
-        _, second = np.split(self.data, 2)
-        self.data = np.vstack((array_to_replace, second))
+        first, _ = np.split(self.data, 2)
+        self.data = np.vstack((first, array_to_replace))
 
     def reset(self):
         """ Resets buffer's data -> sets all elements to zeros """

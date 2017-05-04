@@ -78,18 +78,16 @@ class TrainingThread(object):
         # sync local manger's weights with global
         sess.run(self.sync_manager)
 
-        # update the first half of accumulated data
+        # update the last half of accumulated data
         if self.first == 0:
             zt_batch = sess.run(self.local_network.perception,
                                 {self.local_network.s: self.states})
             # print('zt_batch', zt_batch.shape)
             goals_batch, st_batch =\
                 self.manager_network.run_goal_and_st(sess, zt_batch)
-            # goal_buffer -> if terminal we can catch some old goals,
-            # which needs to recompute within the current context of NN
-            # TODO: replace first cgf.c to align within current context of horizon
-            self.goal_buffer.replace_first_half(goals_batch)
-            self.st_buffer.replace_first_half(st_batch)
+            # second half is used in intrinsic reward calculation
+            self.goal_buffer.replace_second_half(goals_batch)
+            self.st_buffer.replace_second_half(st_batch)
 
         self.states, actions, rewards, values = [], [], [], []
         goals, m_values, states_t, rewards_i, zt_inp = [], [], [], [], []
