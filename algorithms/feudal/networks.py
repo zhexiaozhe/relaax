@@ -279,13 +279,14 @@ class LocalWorkerNetwork(_WorkerNetwork):
         # avoid NaN with getting the maximum with small value
         log_pi = tf.log(tf.maximum(self.pi, 1e-20))
 
-        # policy entropy
-        entropy = -tf.reduce_sum(self.pi * log_pi, axis=1)
+        # policy entropy (-> removed)
+        # entropy = -tf.reduce_sum(self.pi * log_pi, axis=1)
 
         # policy loss (output)  (Adding minus, because the original paper's
         # objective function is for gradient ascent, but we use gradient descent optimizer)
         policy_loss = -tf.reduce_sum(
-            tf.reduce_sum(tf.multiply(log_pi, self.a), axis=1) * self.td + entropy * cfg.entropy_beta)
+            tf.reduce_sum(tf.multiply(log_pi, self.a), axis=1) * self.td
+        )  # + entropy * cfg.entropy_beta)
 
         # R (input for value)
         self.r = tf.placeholder(tf.float32, [None], name="r")
