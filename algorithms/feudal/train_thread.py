@@ -1,5 +1,6 @@
 from __future__ import print_function
 from __future__ import division
+import psutil as psu
 
 import tensorflow as tf
 import numpy as np
@@ -62,6 +63,8 @@ class TrainingThread(object):
         if thread_index == 0:
             self.score_input = tf.placeholder(tf.float32, [], name="episode_reward")
             tf.summary.scalar('episode_reward', self.score_input)
+            self.mem_input = tf.placeholder(tf.float32, [], name="memory_usage")
+            tf.summary.scalar('memory_usage', self.mem_input)
 
     def _anneal_learning_rate(self, global_time_step):
         learning_rate = self.initial_learning_rate *\
@@ -172,7 +175,8 @@ class TrainingThread(object):
 
                 if self.thread_index == 0:
                     summary_str = sess.run(summaries,
-                                           feed_dict={self.score_input: self.episode_reward})
+                                           feed_dict={self.score_input: self.episode_reward,
+                                                      self.mem_input: psu.virtual_memory()[2]})
                     summary_writer.add_summary(summary_str, global_t)
 
                 self.episode_reward = 0
