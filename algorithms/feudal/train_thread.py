@@ -20,16 +20,16 @@ class TrainingThread(object):
                  global_manager):
         self.thread_index = thread_index
         self.goal_buffer = RingBuffer2D(element_size=cfg.d,
-                                        buffer_size=cfg.c*2)
+                                        buffer_size=cfg.c * 2)
         self.st_buffer = RingBuffer2D(element_size=cfg.d,
-                                      buffer_size=cfg.c*2)
+                                      buffer_size=cfg.c * 2)
         self.first = cfg.c
         self.states = []
         self.cur_c = None
         self.eps = 1e-12
 
-        self.initial_learning_rate = cfg.learning_rate
-        self.max_global_time_step = cfg.MAX_TIME_STEP
+        self.half_of_initial_learning_rate = cfg.learning_rate / 2
+        self.anneal_step_limit = cfg.anneal_step_limit
 
         self.manager_network = LocalManagerNetwork(thread_index)
         self.local_network = LocalWorkerNetwork(thread_index)
@@ -66,11 +66,13 @@ class TrainingThread(object):
             self.mem_input = tf.placeholder(tf.float32, [], name="memory_usage")
             tf.summary.scalar('memory_usage', self.mem_input)
 
-    def _anneal_learning_rate(self, global_time_step):
-        learning_rate = self.initial_learning_rate *\
-                        (self.max_global_time_step - global_time_step) / self.max_global_time_step
-        if learning_rate < 0.0:
-            learning_rate = 0.0
+    def _annealing_lr_by_half(self, global_time_step):
+        if global_time_step > self.anneal_step_limit:
+            return self.half_of_initial_learning_rate
+        learning_rate =\
+            self.half_of_initial_learning_rate + \
+            self.half_of_initial_learning_rate * \
+            (self.anneal_step_limit - global_time_step) / self.anneal_step_limit
         return learning_rate
 
     @staticmethod
@@ -86,7 +88,7 @@ class TrainingThread(object):
             zt_batch = sess.run(self.local_network.perception,
                                 {self.local_network.s: self.states})
             # print('zt_batch', zt_batch.shape)
-            goals_batch, st_batch =\
+            goals_batch, st_batch = \
                 self.manager_network.run_goal_and_st(sess, zt_batch)
             # second half is used in intrinsic reward calculation
             self.goal_buffer.replace_second_half(goals_batch)
@@ -118,7 +120,7 @@ class TrainingThread(object):
             m_values.append(v_t)
             self.st_buffer.extend(s_t)
 
-            pi_, value_ =\
+            pi_, value_ = \
                 self.local_network.run_policy_and_value(sess, self.state, goal)
             action = self.choose_action(pi_)
 
@@ -129,7 +131,7 @@ class TrainingThread(object):
             if (self.thread_index == 0) and (self.local_t % 100) == 0:
                 print("TIMESTEP", self.local_t)
                 print("pi=", pi_)
-                print(" V=", v_t)   # value_
+                print(" V=", v_t)  # value_
 
             # act
             env_state, reward, terminal, _ = self.env.step(action)
@@ -184,8 +186,8 @@ class TrainingThread(object):
 
                 self.st_buffer.reset()
                 self.goal_buffer.reset()
-                self.local_network.reset_state()    # may be move further after update
-                self.manager_network.reset_state()  # may be move further after update
+                self.local_network.reset_state()
+                self.manager_network.reset_state()
                 break
 
         diff_local_t = self.local_t - start_local_t
@@ -232,33 +234,33 @@ class TrainingThread(object):
             batch_a.append(a)
             batch_tdM.append(tdM)
             batch_tdW.append(tdW)
-            batch_R.append(R+Ri)
+            batch_R.append(R + Ri)
 
         batch_a.reverse()
         batch_tdM.reverse()
         batch_tdW.reverse()
         batch_R.reverse()
 
-        learning_rate = self._anneal_learning_rate(global_t)
+        learning_rate = self._annealing_lr_by_half(global_t)
         st_diff = self.st_buffer.get_diff(part=diff_local_t)
 
         sess.run([self.apply_manager, self.apply_gradients],
                  feed_dict={
-                         self.manager_network.ph_perception: zt_inp,
-                         self.manager_network.stc_minus_st: st_diff,
-                         self.manager_network.tdM: batch_tdM,
-                         self.manager_network.initial_lstm_state: manager_lstm_state,
-                         self.lrM: learning_rate,
-                         self.manager_network.step_size: [diff_local_t],
+                     self.manager_network.ph_perception: zt_inp,
+                     self.manager_network.stc_minus_st: st_diff,
+                     self.manager_network.tdM: batch_tdM,
+                     self.manager_network.initial_lstm_state: manager_lstm_state,
+                     self.lrM: learning_rate,
+                     self.manager_network.step_size: [diff_local_t],
 
-                         self.local_network.s: states,
-                         self.local_network.ph_goal: goals,
-                         self.local_network.a: batch_a,
-                         self.local_network.td: batch_tdW,
-                         self.local_network.r: batch_R,
-                         self.local_network.initial_lstm_state: start_lstm_state,
-                         self.lrW: learning_rate,
-                         self.local_network.step_size: [diff_local_t]})
+                     self.local_network.s: states,
+                     self.local_network.ph_goal: goals,
+                     self.local_network.a: batch_a,
+                     self.local_network.td: batch_tdW,
+                     self.local_network.r: batch_R,
+                     self.local_network.initial_lstm_state: start_lstm_state,
+                     self.lrW: learning_rate,
+                     self.local_network.step_size: [diff_local_t]})
 
         # return advanced local step size
         return diff_local_t

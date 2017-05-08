@@ -25,9 +25,11 @@ class Config:
 
         # learning rate
         self.learning_rate = 2e-4
+        # annealing lr within first 200mil
+        self.anneal_step_limit = 2 * 10 ** 8
 
         # maximum global time step
-        self.MAX_TIME_STEP = 10 * 10 ** 7
+        self.MAX_TIME_STEP = 10 * 10 ** 8   # 10 * 100mil
 
         self.RMSP_ALPHA = 0.99   # decay parameter for RMSProp
         self.RMSP_EPSILON = 0.1  # epsilon parameter for RMSProp
