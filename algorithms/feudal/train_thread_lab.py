@@ -166,8 +166,9 @@ class TrainingThread(object):
             # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8
 
             self.episode_reward += reward
-            # clip & append external and intrinsic reward
-            rewards.append(np.clip(reward, -1, 1))
+            # append reward without clipping
+            rewards.append(reward)  # rewards.append(np.clip(reward, -1, 1))
+            # append external and intrinsic reward
             rewards_i.append(cfg.alpha * reward_i)
 
             if terminal:
