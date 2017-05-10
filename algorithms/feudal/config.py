@@ -9,7 +9,7 @@ class Config:
         # 'MontezumaRevengeDeterministic-v3' 'PongDeterministic-v3'
 
         # action size for given environment
-        self.action_size = 18   # 18 (MR) | 6 (Pong)
+        self.action_size = 6   # 6 (Lab's medium) | 18 (MR) | 6 (Pong)
 
         # size of the input observation (image to pass through 2D Convolution)
         self.state_size = [84, 84, 3]   # Box(210, 160, 3) - default
@@ -43,5 +43,8 @@ class Config:
         self.h = 10     # number of manager's cores (horizon)
         self.c = 10     # goal horizon to sum up
         self.alpha = 1  # alpha for intrinsic reward
+
+        # lab's map
+        self.level = 'tests/my_map'
 
 cfg = Config()

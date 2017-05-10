@@ -8,7 +8,7 @@ import numpy as np
 
 from networks import LocalWorkerNetwork
 from networks import LocalManagerNetwork
-from config_lab import cfg
+from config import cfg
 from utils import RingBuffer2D
 from lab.environment import Lab
 
