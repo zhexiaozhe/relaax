@@ -43,9 +43,8 @@ class Lab(object):
         if terminal:
             return reward, terminal, None
 
-        # train screen shape is (84, 84) by default
-        screen = self.env.observations()['RGB_INTERLACED']
-        x_t = np.dot(screen[..., :3], [0.299, 0.587, 0.114])
+        # train screen shape is (84, 84, 3) by default
+        x_t = self.env.observations()['RGB_INTERLACED']
         if self._display:
             x_t = imresize(x_t, (self._width, self._height))
 
