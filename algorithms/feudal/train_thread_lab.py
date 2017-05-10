@@ -134,7 +134,7 @@ class TrainingThread(object):
                 print(" V=", v_t)  # value_
 
             # act
-            env_state, reward, terminal, _ = self.env.act(action)
+            reward, terminal = self.env.act(action)
             self.local_t += 1
 
             # calc internal rewards produces by manager
@@ -142,7 +142,7 @@ class TrainingThread(object):
             if self.cur_c < cfg.c:
                 self.cur_c += 1
             if not terminal:
-                self.state = env_state
+                self.state = self.env.state()
                 z_t = sess.run(self.local_network.perception,
                                {self.local_network.s: [self.state]})
                 s_t = self.manager_network.run_st(sess, z_t)
