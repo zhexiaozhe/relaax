@@ -7,7 +7,7 @@ import signal
 import time
 import os
 
-from config import cfg
+from config_lab import cfg
 from networks import GlobalManagerNetwork
 from networks import GlobalWorkerNetwork
 from train_thread_lab import TrainingThread
