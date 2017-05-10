@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import sys
+
+sys.path.append('/home/dennis/Projects/random_agent.runfiles/org_deepmind_lab')
+import deepmind_lab
+
+
+"""Spins up an environment and runs the random agent."""
+level = 'tests/my_map'
+env = deepmind_lab.Lab(
+    level, ['RGB_INTERLACED'],
+    config={
+        'fps': str(20),
+        'width': str(84),
+        'height': str(84)
+    })
+
+env.reset()
