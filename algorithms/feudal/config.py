@@ -44,4 +44,7 @@ class Config:
         self.c = 10     # goal horizon to sum up
         self.alpha = 1  # alpha for intrinsic reward
 
+        # lab's map
+        self.level = 'tests/my_map'
+
 cfg = Config()
