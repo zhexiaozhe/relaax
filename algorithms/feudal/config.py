@@ -45,6 +45,6 @@ class Config:
         self.alpha = 1  # alpha for intrinsic reward
 
         # lab's map
-        self.level = 'tests/my_map'
+        self.level = 'tests/read_map'
 
 cfg = Config()
