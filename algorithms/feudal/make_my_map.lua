@@ -4,8 +4,8 @@ local LEVEL_DATA = '/tmp/dmlab_level_data'
 local make_map = {}
 
 local pickups = {
-    A = 'apple_reward',
-    G = 'goal',
+    A = 'negative_one',
+    G = 'positive_one',
     P = 'info_player_start'
 }
 
