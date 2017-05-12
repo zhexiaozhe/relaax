@@ -12,7 +12,7 @@ local pickups = {
 function make_map.makeMap(mapName, mapEntityLayer, mapVariationsLayer)
   os.execute('mkdir -p ' .. LEVEL_DATA .. '/baselab')
   assert(mapName)
-  print('mapEntityLayer: ' .. mapEntityLayer)
+  print('mapEntityLayer: \n' .. mapEntityLayer)
   map_maker:mapFromTextLevel{
       entityLayer = mapEntityLayer,
       variationsLayer = mapVariationsLayer,
