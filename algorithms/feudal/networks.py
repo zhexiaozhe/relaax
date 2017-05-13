@@ -81,7 +81,7 @@ class _ManagerNetwork(object):
         # lstm_outputs (?, d)
 
         # goal (output)
-        self.goal = tf.nn.l2_normalize(lstm_outputs, dim=0)
+        self.goal = tf.nn.l2_normalize(lstm_outputs, dim=1)
 
         # value (output)
         v_ = tf.matmul(lstm_outputs, W_Mcritic) + b_Mcritic
@@ -110,9 +110,9 @@ class LocalManagerNetwork(_ManagerNetwork):
         super(LocalManagerNetwork, self).__init__(thread_index)
         # tf.losses.cosine_distance(labels, predictions)
         self.stc_minus_st = tf.placeholder(tf.float32, [None, cfg.d], name="stc_minus_st")
-        s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=0)
+        s_diff_normalized = tf.nn.l2_normalize(self.stc_minus_st, dim=1)
 
-        cosine_similarity = tf.matmul(s_diff_normalized, tf.transpose(self.goal))
+        cosine_similarity = tf.matmul(s_diff_normalized, self.goal, transpose_b=True)
         cosine_similarity = tf.reduce_sum(cosine_similarity, axis=1)
 
         # temporary difference (R-V) (input for manager's advantage)
