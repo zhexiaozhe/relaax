@@ -147,22 +147,19 @@ class TrainingThread(object):
                                {self.local_network.s: [self.state]})
                 s_t = self.manager_network.run_st(sess, z_t)
 
-                reward_i = []
-                for k in range(1, self.cur_c + 1):
-                    cur_st = s_t - self.st_buffer.data[-k, :]
-                    cur_st_norm =\
-                        np.maximum(np.linalg.norm(cur_st, axis=1), self.eps)
-                    st_normed = (cur_st.transpose() / cur_st_norm).transpose()
+                cur_st = s_t - self.st_buffer.data[-self.cur_c:, :]
+                cur_st_norm =\
+                    np.maximum(np.linalg.norm(cur_st, axis=1), self.eps)
+                st_normed = (cur_st.transpose() / cur_st_norm).transpose()
 
-                    cur_goal = self.goal_buffer.data[-k, :]
-                    cur_goal_norm =\
-                        np.maximum(np.linalg.norm(cur_goal, axis=1), self.eps)
-                    goals_normed = cur_goal.transpose() / cur_goal_norm
+                cur_goal = self.goal_buffer.data[-self.cur_c:, :]
+                cur_goal_norm =\
+                    np.maximum(np.linalg.norm(cur_goal, axis=1), self.eps)
+                goals_normed = cur_goal.transpose() / cur_goal_norm
 
-                    cosine = np.dot(st_normed, goals_normed)
-                    reward_i.append(cosine)
+                cosine = np.dot(st_normed, goals_normed)
 
-                reward_i = sum(reward_i) / self.cur_c
+                reward_i = sum(cosine.diagonal()) / self.cur_c
             else:
                 reward_i = 0
             # reward + alpha * reward_i -> alpha in [0,1] >> try 1 or 0.8
