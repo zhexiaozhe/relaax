@@ -6,7 +6,7 @@ import os
 
 from config import cfg
 from networks import A3CGlobalNetwork
-from a3c_thread import A3CTrainingThread
+from a3c_thread_lab import A3CTrainingThread
 
 
 class Trainer:
