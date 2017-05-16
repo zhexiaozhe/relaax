@@ -16,7 +16,7 @@ class Config:
         self.threads_num = 8
 
         # local loop size for one episode
-        self.LOCAL_T_MAX = 10   # 10 (Lab) | 10 (MR) | 20 (Pong)
+        self.LOCAL_T_MAX = 20   # 10 (Lab) | 10 (MR) | 20 (Pong)
 
         # learning rate
         self.entropy_beta = 1e-2
