@@ -7,7 +7,7 @@ class Config:
 
         # action size for given environment
         self.action_size0 = 6   # 6 (Pong)
-        self.action_size1 = 6   # 6 (Breakout)
+        self.action_size1 = 4   # 6->4 (Breakout)
 
         # size of the input observation (image to pass through 2D Convolution)
         self.state_size = [84, 84, 3]   # Box(210, 160, 3) - default
