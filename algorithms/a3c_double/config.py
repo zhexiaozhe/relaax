@@ -1,8 +1,8 @@
 class Config:
     def __init__(self):
         # gym's environment name
-        self.env_name0 = 'PongDeterministic-v3'
-        self.env_name1 = 'BreakoutDeterministic-v3'
+        self.env_name0 = 'PongDeterministic-v4'
+        self.env_name1 = 'BreakoutDeterministic-v4'
         # 'MontezumaRevengeDeterministic-v3'
 
         # action size for given environment
