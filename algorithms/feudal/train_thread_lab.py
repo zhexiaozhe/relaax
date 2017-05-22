@@ -80,7 +80,8 @@ class TrainingThread(object):
         return np.random.choice(len(pi_probs), p=pi_probs)
 
     def process(self, sess, global_t, summaries, summary_writer):
-        # sync local manger's weights with global
+        # copy weights from global to local
+        sess.run(self.sync)
         sess.run(self.sync_manager)
 
         # update the last half of accumulated data
@@ -99,8 +100,7 @@ class TrainingThread(object):
         terminal_end = False
         self.cur_c = 0
 
-        # copy weights from shared to local
-        sess.run(self.sync)
+        # set step to 0 for manager at the beginning of the loop
         sess.run(self.manager_network.lstm.reset_timestep)
 
         start_local_t = self.local_t
