@@ -3,16 +3,15 @@ algorithm:
 
   input:
     shape: [84, 84]
-    channels: 3
-    history: 1
+    history: 4
     use_convolutions: true
 
   output:
     continuous: false
-    action_size: 6                # action size for the given environment
+    action_size: 18               # action size for the given environment
 
   hidden_sizes: [256]
-  batch_size: 20                  # local loop size for one episode
+  batch_size: 5                   # local loop size for one episode
 
   use_lstm: true                  # to use LSTM instead of FF, set to the True
   max_global_step: 1e8            # amount of maximum global steps to pass through the training

@@ -36,7 +36,7 @@ class GymEnv(object):
         'Tennis', 'TimePilot', 'Tutankham', 'UpNDown', 'Venture',
         'VideoPinball', 'WizardOfWor', 'YarsRevenge', 'Zaxxon']
 
-    def __init__(self, env='CartPole-v0', no_op_max=0, limit=800):
+    def __init__(self, env='BoxingDeterministic-v4', no_op_max=9, limit=800):
         self.gym = gym.make(env)
 
         self.gym.seed(random.randrange(1000000))
